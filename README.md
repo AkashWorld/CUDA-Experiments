@@ -4,3 +4,6 @@ This repository holds some of our experiments in parallelizing existing algorith
 
 ### Installing
 Build instructions for the individual problems reside in the problem folders; please inspect the individual readme files. Write ups and analysis can be found in the individual folders as well.
+
+### Contributions
+Please create a subdirectory for the problem you are working on (ie. problem_2 directory for Problem 2) on a **separate branch**. Then once you are finished with the problem (tested, build instructions in readme.md, and writeup), submit a pull request.
