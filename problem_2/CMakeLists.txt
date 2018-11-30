@@ -1,21 +1,21 @@
+enable_testing()
+
 if (UNIX)
 cmake_minimum_required(VERSION 3.5.0 FATAL_ERROR)
-project(A_STAR_SEARCH LANGUAGES CXX)
+project(MATRIX_MULTIPLICATION LANGUAGES CXX CUDA)
 endif(UNIX)
 
 if (WIN32) #Temporary
 cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
-project(A_STAR_SEARCH LANGUAGES CXX CUDA)
+project(MATRIX_MULTIPLICATION CXX CUDA)
 endif(WIN32)
 
 set (CMAKE_CXX_STANDARD 11)
-include_directories(src libs/Catch2 libs/logger)
+include_directories(src libs/catch2 libs/logger)
 
-set(TEST TRUE)
-
-if (TEST)
-add_executable(main test/test.cpp)
-else()
 add_executable(main src/main.cpp)
-endif (TEST)
-target_link_libraries(main graph a_star ${CMAKE_THREAD_LIBS_INIT})
+add_executable(catch_test test/test.cpp)
+target_link_libraries(catch_test)
+target_link_libraries(main)
+
+add_test(test catch_test)

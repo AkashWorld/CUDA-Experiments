@@ -24,8 +24,15 @@ make
 
 ## Running the tests
 
-TODO: Explain how to run the automated tests for this system
-
+Build the project as specified in the **Installing** section.  
+Run the following command at the root build directory:
+```
+make test
+```
+To run the tests directly, run the following:
+```
+./catch_test
+```
 
 ## Authors
 

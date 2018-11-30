@@ -5,6 +5,6 @@ TEST_CASE("Matrix Generation", "[Matrix]")
 {
     SECTION("Dimension Test")
     {
-
+        REQUIRE(true);
     }
 }
