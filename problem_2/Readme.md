@@ -4,7 +4,7 @@ This project compares different methods of matrix multiplication: classical CPU 
 
 ### Prerequisites
 * [CMake](https://cmake.org/download/) - Cross Platform Build System  
-C++ 11 Compiler (g++, MSVC, clang++, etc)  
+* C++ 11 Compiler (g++, MSVC, clang++, etc)  
 * [CUDA](https://developer.nvidia.com/cuda-zone) - GPGPU Interface Used
 
 ### Installing
