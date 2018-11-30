@@ -4,3 +4,5 @@
 *.ptx
 *.cubin
 *.fatbin
+*/.vscode
+problem_2/build
