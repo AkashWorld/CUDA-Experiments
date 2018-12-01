@@ -59,23 +59,11 @@ Khalid Akash 2018 - MIT License
 #define debug_log(...)
 #endif
 
-#define log(fmt, ...)                      \
-    do                                     \
-    {                                      \
-        fprintf(stderr, fmt, __VA_ARGS__); \
-    } while (0)
-
 #define err_log(fmt, ...)                                         \
     do                                                            \
     {                                                             \
         fprintf(stderr, BOLD(RED("ERROR %s:%d:%s(): " fmt)), __FILE__, \
                 __LINE__, __func__, __VA_ARGS__);                 \
-    } while (0)
-
-#define logln(fmt, ...)                         \
-    do                                          \
-    {                                           \
-        fprintf(stderr, fmt "\n", __VA_ARGS__); \
     } while (0)
 
 #define err_logln(fmt, ...)                                            \

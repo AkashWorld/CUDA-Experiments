@@ -4,8 +4,8 @@ This project compares different methods of matrix multiplication: classical CPU 
 
 ### Prerequisites
 * [CMake](https://cmake.org/download/) - Cross Platform Build System  
-* C++ 11 Compiler (g++, MSVC, clang++, etc)  
-* [CUDA](https://developer.nvidia.com/cuda-zone) - GPGPU Interface Used
+* C++ 11 Compiler (g++, MSVC(cl), clang++, etc)  
+* [CUDA Compiler (nvcc)](https://developer.nvidia.com/cuda-zone) - GPGPU Interface Used
 
 ### Installing
 
@@ -25,11 +25,11 @@ make
 ## Running the tests
 
 Build the project as specified in the **Installing** section.  
-Run the following command at the root build directory:
+Run the following command at the root **build** directory:
 ```
 make test
 ```
-To run the tests directly, run the following:
+To run the tests directly, run the following in the root **build** directory:
 ```
 ./catch_test
 ```
