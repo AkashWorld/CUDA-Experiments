@@ -3,18 +3,18 @@
 #include <random>
 #include <cassert>
 #include <logger.h>
-#include <cuda_runtime.h>
-#include <cublas_v2.h>
+#include <limits>
+#include "matrix.cu"
 
 template <typename T>
 class Matrix
 {
-  private:
+private:
 	std::vector<T> data_arr;
 	std::size_t row;
 	std::size_t col;
 
-  public:
+public:
 	Matrix(std::size_t row, std::size_t col)
 	{
 		data_arr.resize(row * col);
@@ -33,21 +33,25 @@ class Matrix
 		this->row = row;
 		this->col = col;
 	}
-	std::vector<T> &get_vector()
+	inline std::vector<T> &get_vector()
 	{
 		return data_arr;
 	}
-	std::size_t get_row_size()
+	inline std::size_t get_row_size()
 	{
 		return row;
 	}
-	std::size_t get_col_size()
+	inline std::size_t get_col_size()
 	{
 		return col;
 	}
-	bool is_empty()
+	inline bool is_empty()
 	{
 		return row == 0 || col == 0;
+	}
+	inline std::size_t element_count()
+	{
+		return this->row*this->col;
 	}
 	T *operator[](std::size_t index)
 	{
@@ -59,6 +63,7 @@ class Matrix
 		if (this->row != rh_matrix.col || this->col != rh_matrix.row ||
 			this->is_empty() || rh_matrix.is_empty())
 		{
+			debug_logln("Invalid matrix input.");
 			return Matrix(0, 0);
 		}
 		const std::size_t row = this->row;
@@ -87,6 +92,7 @@ class Matrix
 		if (this->row != rh_matrix.col || this->col != rh_matrix.row ||
 			this->is_empty() || rh_matrix.is_empty())
 		{
+			debug_logln("Invalid matrix input.");
 			return Matrix(0, 0);
 		}
 		const std::size_t row = this->row;
@@ -115,6 +121,10 @@ class Matrix
 		}
 		return ret_matrix;
 	}
+	Matrix<T> cublas_multiply(Matrix<T> &rh_matrix)
+	{
+		return Matrix<T>(0, 0);
+	}
 	bool is_equal(Matrix &other)
 	{
 		if (this->row != other.row || this->col != other.col)
@@ -125,7 +135,7 @@ class Matrix
 		{
 			for (std::size_t j = 0; j < this->col; ++j)
 			{
-				if((*this)[i][j] != other[i][j])
+				if ((*this)[i][j] != other[i][j])
 				{
 					return false;
 				}
@@ -144,6 +154,29 @@ class Matrix
 };
 
 template <>
+Matrix<float> Matrix<float>::cublas_multiply(Matrix<float> &rh_matrix)
+{
+	if (this->row != rh_matrix.col || this->col != rh_matrix.row ||
+		this->is_empty() || rh_matrix.is_empty())
+	{
+		debug_logln("Invalid matrix input.");
+		return Matrix(0, 0);
+	}
+	const std::size_t row = this->row;
+	const std::size_t col = rh_matrix.col;
+	std::size_t n = this->col * this->row;
+	float *result = fl_cublas_matrix_multiply(this->get_vector().data(), rh_matrix.get_vector().data(),
+			this->row, this->col, rh_matrix.row, rh_matrix.col);
+	if (result == NULL)
+	{
+		err_logln("Error performing cuBLAS multiplication of two matrices!");
+		return Matrix(0, 0);
+	}
+	return Matrix(result, row, col);
+	pause_terminal();
+}
+
+template <>
 Matrix<unsigned int> Matrix<unsigned int>::generate_random_matrix(std::size_t row, std::size_t col)
 {
 	Matrix<unsigned int> matrix(row, col);
@@ -153,6 +186,23 @@ Matrix<unsigned int> Matrix<unsigned int>::generate_random_matrix(std::size_t ro
 		for (std::size_t j = 0; j < matrix.get_col_size(); ++j)
 		{
 			matrix[i][j] = rd();
+		}
+	}
+	return matrix;
+}
+
+template <>
+Matrix<float> Matrix<float>::generate_random_matrix(std::size_t row, std::size_t col)
+{
+	Matrix<float> matrix(row, col);
+	std::random_device rd;
+	for (std::size_t i = 0; i < matrix.get_row_size(); ++i)
+	{
+		for (std::size_t j = 0; j < matrix.get_col_size(); ++j)
+		{
+			float new_number = static_cast<float>(rd()) / static_cast<float>
+				(RAND_MAX / (std::numeric_limits<float>::max() - std::numeric_limits<float>::min()));
+			matrix[i][j] = new_number;
 		}
 	}
 	return matrix;

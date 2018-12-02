@@ -38,17 +38,23 @@ TEST_CASE("M*N Matrix", "[Matrix]")
     }
     SECTION("CPU Block Multiplication Test, NxN")
     {
-        auto mat_1 = Matrix<unsigned int>::generate_random_matrix(10, 10);
-        auto mat_2 = Matrix<unsigned int>::generate_random_matrix(10, 10);
+        auto mat_1 = Matrix<unsigned int>::generate_random_matrix(20, 20);
+        auto mat_2 = Matrix<unsigned int>::generate_random_matrix(20, 20);
         auto normal_result = mat_1 * mat_2;
         auto result = mat_1.block_multiply(mat_2);
         REQUIRE(!result.is_empty());
-        REQUIRE(result.get_row_size() == 10);
-        REQUIRE(result.get_col_size() == 10);
-        debug_logln("Printing normal result%s\n", "");
-        normal_result.print_dec();
-        debug_logln("Printing blocked result%s\n", "");
-        result.print_dec();
+        REQUIRE(result.get_row_size() == 20);
+        REQUIRE(result.get_col_size() == 20);
         REQUIRE(normal_result.is_equal(result));
     }
+	SECTION("cuBLAS accelerated Multiplication Test")
+	{
+		float arr_0[6] = { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f };
+		float arr_1[6] = { 7.0f, 8.0f, 9.0f, 10.0f, 11.0f, 12 };
+		Matrix<float> mat_0(arr_0, 2, 3);
+		Matrix<float> mat_1(arr_1, 3, 2);
+		auto normal_result = mat_0 * mat_1;
+		auto cublas_result = mat_0.cublas_multiply(mat_1);
+		REQUIRE(cublas_result.is_equal(cublas_result));
+	}
 }

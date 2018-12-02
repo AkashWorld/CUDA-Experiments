@@ -45,13 +45,13 @@ Khalid Akash 2018 - MIT License
 #define debug_log(fmt, ...)                                \
     do                                                     \
     {                                                      \
-        fprintf(stderr, YEL("DEBUG %s:%d:%s(): " fmt), __FILE__, \
+        fprintf(stderr, YEL("DEBUG %s - %d:%s(): " fmt), __TIME__, \
                 __LINE__, __func__, __VA_ARGS__);          \
     } while (0)
 #define debug_logln(fmt, ...)                                   \
     do                                                          \
     {                                                           \
-        fprintf(stderr, YEL("DEBUG %s:%d:%s(): " fmt "\n"), __FILE__, \
+        fprintf(stderr, YEL("DEBUG %s - %d:%s(): " fmt "\n"), __TIME__, \
                 __LINE__, __func__, __VA_ARGS__);               \
     } while (0)
 #else
@@ -59,17 +59,30 @@ Khalid Akash 2018 - MIT License
 #define debug_log(...)
 #endif
 
+#ifdef WIN32
+/*Stops console from immediately disappearing in MSVS*/
+inline void pause_terminal()
+{
+	char pause_buffer[256];
+	scanf(pause_buffer);
+}
+#else
+inline void pause_terminal() {};
+#endif
+
 #define err_log(fmt, ...)                                         \
     do                                                            \
     {                                                             \
-        fprintf(stderr, BOLD(RED("ERROR %s:%d:%s(): " fmt)), __FILE__, \
+        fprintf(stderr, BOLD(RED("ERROR %s - %d:%s(): " fmt)), __TIME__, \
                 __LINE__, __func__, __VA_ARGS__);                 \
+		pause_terminal(); \
     } while (0)
 
 #define err_logln(fmt, ...)                                            \
     do                                                                 \
     {                                                                  \
-        fprintf(stderr, BOLD(RED("ERROR %s:%d:%s(): " fmt "\n")), __FILE__, \
+        fprintf(stderr, BOLD(RED("ERROR %s - %d:%s(): " fmt "\n")), __TIME__, \
                 __LINE__, __func__, __VA_ARGS__);                      \
+		pause_terminal(); \
     } while (0)
 #endif
