@@ -1,15 +1,87 @@
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 #include <logger.h>
+#include <stdlib.h>
 #define IDX2C(i,j,ld) (((j)*(ld))+(i))
 
 static const char *_cudaGetErrorEnum(cublasStatus_t error);
 
+__global__ void matrix_multiply(float *rh_mat, float *lh_mat, float *res_mat)
+{
+
+}
+
+#define CHECK_ERR(x) if (x != cudaSuccess) {						\
+	err_logln("Cuda error caught! Error: ", cudaGetErrorString(x)); \
+	goto free;														\
+}																	\
+
+/*TODO: Complete*/
+float *fl_cuda_matrix_multiply(float *rh_mat, float *lh_mat,
+	std::size_t lh_row, std::size_t lh_col, std::size_t rh_row, std::size_t rh_col)
+{
+	const std::size_t n = rh_row * rh_col;
+	const std::size_t size = n * sizeof(float);
+	float *result_matrix = (float *)malloc(size);
+	if (result_matrix == NULL)
+	{
+		err_logln("Error allocating host memory!%s", "");
+		return NULL;
+	}
+	float *dev_rh_mat, *dev_lh_mat, *dev_res_mat;
+	cudaError_t error_stat;
+	if ((error_stat = cudaMalloc(&dev_rh_mat, size)) != cudaSuccess) {
+		err_logln("Error allocating device memory! Error: %s", cudaGetErrorString(error_stat));
+		free(result_matrix);
+		return NULL;
+	}
+	if ((error_stat = cudaMalloc(&dev_lh_mat, size)) != cudaSuccess) {
+		err_logln("Error allocating device memory! Error: %s", cudaGetErrorString(error_stat));
+		free(result_matrix);
+		cudaFree(dev_rh_mat);
+		return NULL;
+	}
+	if ((error_stat = cudaMalloc(&dev_res_mat, size)) != cudaSuccess) {
+		err_logln("Error allocating device memory! Error: %s", cudaGetErrorString(error_stat));
+		free(result_matrix);
+		cudaFree(dev_rh_mat);
+		cudaFree(dev_lh_mat);
+		return NULL;
+	}
+	error_stat = cudaMemcpy(dev_rh_mat, rh_mat, size, cudaMemcpyHostToDevice);
+	CHECK_ERR(error_stat);
+	error_stat = cudaMemcpy(dev_lh_mat, lh_mat, size, cudaMemcpyHostToDevice);
+	CHECK_ERR(error_stat);
+	
+	
+
+	error_stat = cudaMemcpy(result_matrix, dev_res_mat, size, cudaMemcpyDeviceToHost);
+	CHECK_ERR(error_stat);
+free:
+	if ((error_stat = cudaFree(dev_rh_mat)) != cudaSuccess) {
+		err_logln("Error freeing device memory! Error: %s", cudaGetErrorString(error_stat));
+	}
+	if ((error_stat = cudaFree(dev_lh_mat)) != cudaSuccess) {
+		err_logln("Error freeing device memory! Error: %s", cudaGetErrorString(error_stat));
+	}
+	if ((error_stat = cudaFree(dev_res_mat)) != cudaSuccess) {
+		err_logln("Error freeing device memory! Error: %s", cudaGetErrorString(error_stat));
+	}
+	return result_matrix;
+}
+
+/*TODO: Complete*/
 float *fl_cublas_matrix_multiply(float *rh_mat, float *lh_mat, 
 		std::size_t lh_row, std::size_t lh_col, std::size_t rh_row, std::size_t rh_col)
 {
-	float *ret_result;
 	std::size_t n = lh_row * rh_col;
+	std::size_t size = n * sizeof(float);
+	float *ret_result = (float *)malloc(size);
+	if (ret_result == NULL)
+	{
+		err_logln("Error allocating host memory.%s", "");
+		return NULL;
+	}
 	cudaError_t cuda_stat;
 	cublasStatus_t status;
 	cublasHandle_t handle;

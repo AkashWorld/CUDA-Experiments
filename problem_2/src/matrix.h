@@ -121,8 +121,13 @@ public:
 		}
 		return ret_matrix;
 	}
+	Matrix<T> cuda_multiply(Matrix<T> &rh_matrix) {
+		/*Requires type specific implementation*/
+		return Matrix<T>(0, 0);
+	}
 	Matrix<T> cublas_multiply(Matrix<T> &rh_matrix)
 	{
+		/*Requires type specific implementation*/
 		return Matrix<T>(0, 0);
 	}
 	bool is_equal(Matrix &other)
@@ -154,6 +159,27 @@ public:
 };
 
 template <>
+Matrix<float> Matrix<float>::cuda_multiply(Matrix<float> &rh_matrix)
+{
+	if (this->row != rh_matrix.col || this->col != rh_matrix.row ||
+		this->is_empty() || rh_matrix.is_empty())
+	{
+		debug_logln("Invalid matrix input.");
+		return Matrix(0, 0);
+	}
+	const std::size_t row = this->row;
+	const std::size_t col = rh_matrix.col;
+	float *result = fl_cuda_matrix_multiply(this->get_vector().data(), rh_matrix.get_vector().data(),
+		this->row, this->col, rh_matrix.row, rh_matrix.col);
+	if (result == NULL)
+	{
+		err_logln("Error performing CUDA multiplication of two matrices!");
+		return Matrix(0, 0);
+	}
+	return Matrix(result, row, col);
+}
+
+template <>
 Matrix<float> Matrix<float>::cublas_multiply(Matrix<float> &rh_matrix)
 {
 	if (this->row != rh_matrix.col || this->col != rh_matrix.row ||
@@ -173,7 +199,6 @@ Matrix<float> Matrix<float>::cublas_multiply(Matrix<float> &rh_matrix)
 		return Matrix(0, 0);
 	}
 	return Matrix(result, row, col);
-	pause_terminal();
 }
 
 template <>
