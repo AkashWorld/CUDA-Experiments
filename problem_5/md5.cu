@@ -1,18 +1,18 @@
 /**
  **********************************************************************
- ** Copyright (C) 1990, RSA Data Security, Inc. All rights reserved. **
+ ** Copyright (C) 1990, RSA digest Security, Inc. All rights reserved. **
  **                                                                  **
  ** License to copy and use this software is granted provided that   **
- ** it is identified as the "RSA Data Security, Inc. MD5 Message     **
+ ** it is identified as the "RSA digest Security, Inc. MD5 Message     **
  ** Digest Algorithm" in all material mentioning or referencing this **
  ** software or this function.                                       **
  **                                                                  **
  ** License is also granted to make and use derivative works         **
  ** provided that such works are identified as "derived from the RSA **
- ** Data Security, Inc. MD5 Message Digest Algorithm" in all         **
+ ** digest Security, Inc. MD5 Message Digest Algorithm" in all         **
  ** material mentioning or referencing the derived work.             **
  **                                                                  **
- ** RSA Data Security, Inc. makes no representations concerning      **
+ ** RSA digest Security, Inc. makes no representations concerning      **
  ** either the merchantability of this software or the suitability   **
  ** of this software for any particular purpose.  It is provided "as **
  ** is" without express or implied warranty of any kind.             **
@@ -54,7 +54,7 @@
     (a) += (b); \
   }
 
-__device__ inline void md5(unsigned char* data, uint32_t length, uint32_t *a1, uint32_t *b1, uint32_t *c1, uint32_t *d1){
+__device__ inline void md5(unsigned char * digest, uint32_t length, uint32_t *r1, uint32_t *r2, uint32_t *r3, uint32_t *r4){
   const uint32_t a0 = 0x67452301;
   const uint32_t b0 = 0xEFCDAB89;
   const uint32_t c0 = 0x98BADCFE;
@@ -69,7 +69,7 @@ __device__ inline void md5(unsigned char* data, uint32_t length, uint32_t *a1, u
 
   int i = 0;
   for(i=0; i < length; i++){
-    vals[i / 4] |= data[i] << ((i % 4) * 8);
+    vals[i / 4] |= digest[i] << ((i % 4) * 8);
   }
   
   vals[i / 4] |= 0x80 << ((i % 4) * 8);
@@ -192,8 +192,8 @@ __device__ inline void md5(unsigned char* data, uint32_t length, uint32_t *a1, u
   c += c0;
   d += d0;
 
-  *a1 = a;
-  *b1 = b;
-  *c1 = c;
-  *d1 = d;
+  *r1 = a;
+  *r2 = b;
+  *r3 = c;
+  *r4 = d;
 }
