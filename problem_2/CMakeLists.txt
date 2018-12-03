@@ -9,6 +9,7 @@ project(MATRIX_MULTIPLICATION LANGUAGES CXX)
 else (NCUDA)
 cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
 project(MATRIX_MULTIPLICATION LANGUAGES CXX CUDA)
+include_directories($ENV{CUDA_PATH}/include)
 endif(NCUDA)
 
 set (CMAKE_CXX_STANDARD 11)
