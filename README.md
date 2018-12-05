@@ -7,3 +7,10 @@ Build instructions for the individual problems reside in the problem folders; pl
 
 ### Contributions
 Please create a subdirectory for the problem you are working on (ie. problem_2 directory for Problem 2) on a **separate branch**. Then once you are finished with the problem (tested, build instructions in readme.md, and writeup), submit a pull request.
+
+## Current Allocations
+Problem 1 - Ryan
+Problem 2 - Khalid and Bhargav
+Problem 3 - Suva and Jon
+Problem 4 - Dan
+Problem 5 - (Must be done by both groups) Brandon
