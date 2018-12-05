@@ -7,7 +7,7 @@ using namespace std;
 
 int main(int arg, char** argv)
 {
-	if (arg != 2) 
+	if (arg != 2)
 	{
 		cout << "usage: ./out size" << endl;
 		return -1;
@@ -27,35 +27,37 @@ int main(int arg, char** argv)
 
 	int x = atoi(argv[1]);
 
-	int** arr = (int**)malloc(x*sizeof(int*));
+	int** arr = (int**)malloc(x * sizeof(int*));
 	int i = 0, j = 0;;
-	
+
 	for (i = 0; i < x; i++) {
 
-		arr[i] = (int*)malloc(x*sizeof(int));
+		arr[i] = (int*)malloc(x * sizeof(int));
 	}
 
 	for (i = 0; i < x; i++) {
-		
+
 		for (j = 0; j < x; j++) {
 			arr[i][j] = 0;
 		}
 
 	}
-
-	int e = rand() % x + 1;  // max edge? directed?
-	cout << e;
-
+	int max = x*x - x - 1;
+	int e = rand() % max + 1;  // max edge? directed?
+	//cout << e;
+	file_ << "creating graph with: " << x << " vertices " << e << " edges" << endl;
+	file_ << x << endl;
+	file_ << e << endl;
 	for (int k = 0; k < e; k++) {
 		i = rand() % x;
 		j = rand() % x;
 
-		if (arr[i][j] ==-1) {
+		if (arr[i][j] == -1) {
 			k--;
 		}
-		else 
+		else
 		{
-			if (i != j) 
+			if (i != j)
 			{
 				arr[i][j] = 1;
 			}
@@ -67,9 +69,9 @@ int main(int arg, char** argv)
 	}
 
 	for (int i = 0; i < x; i++) {
-		
+
 		for (int j = 0; j < x; j++) {
-			
+
 			file_ << arr[i][j];
 		}
 
