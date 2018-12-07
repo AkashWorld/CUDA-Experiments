@@ -80,11 +80,6 @@ int main(int argc, char* argv[]) {
     C2 = (testType *)malloc(m*p*sizeof(*C2));
     C3 = (testType *)malloc(m*p*sizeof(*C3));
     C4 = (testType *)malloc(m*p*sizeof(*C4));
-
-    srand(time(NULL));
-    //Generating random input matrices
-    gen_rand_mat(A, m, n);
-    gen_rand_mat(B, n, p);
   //  print_matrix(A, m, n);
   //  print_matrix(B, n, p);
 
@@ -105,10 +100,15 @@ int main(int argc, char* argv[]) {
   //  print_matrix(B, n, p);
 
     for (int i = 0; i < iter; i++) {
+
+        srand(time(NULL));
+        //Generating random input matrices
+        gen_rand_mat(A, m, n);
+        gen_rand_mat(B, n, p);
+
         gemm.matrix_multiply_normal(A, B, C1, m, n, p, true, false);
         serial += gemm.getExecTime("normal");
-    }
-    printf("[Serial] matrix multiplication time for %d iterations: %f secs\n", iter, serial);
+   // }
     /*
     if (std::is_floating_point<testType>::value) {
         printf("Checking output with gemm...");
@@ -118,48 +118,54 @@ int main(int argc, char* argv[]) {
     //Print output matrix and sets it to 0
   //  print_matrix(C1, m, p);
 
-    for (int i = 0; i < iter; i++) {
+ //   for (int i = 0; i < iter; i++) {
         gemm.matrix_multiply_unrolled_cpu(A, B, C2, m, n, p, true, false);
         cpu_ur += gemm.getExecTime("cpu_unrolled");
-    }
-    printf("[CPU unrolled] matrix multiplication time for %d iterations: %f secs\n", iter, cpu_ur);
+  //  }
     /*
     if (std::is_floating_point<testType>::value) {
         printf("Checking output with gemm...");
         compare_matrices(C0, C2, m, p);
     }
     */
-    printf("Checking output with serial...");
-    compare_matrices(C1, C2, m, p);
+  //  printf("Checking output with serial...");
+   // compare_matrices(C1, C2, m, p);
     //Print output matrix and sets it to 0
    // print_matrix(C2, m, p);
 
-    for (int i = 0; i < iter; i++) {
+  //  for (int i = 0; i < iter; i++) {
         gemm.matrix_multiply_unrolled_gpu(A, B, C3, m, n, p, true, false);
         gpu_ur += gemm.getExecTime("gpu_unrolled");
-    }
-    printf("[GPU unrolled] matrix multiplication time for %d iterations: %f secs\n", iter, gpu_ur);
-    printf("Checking output with serial...");
-    compare_matrices(C1, C3, m, p);
-    /*
-    if (std::is_floating_point<testType>::value) {
-        printf("Checking output with gemm...");
-        compare_matrices(C0, C3, m, p);
-    }
-    */
-
-    if (m == n && n == p && m == p) {
-        for (int i = 0; i < iter; i++) {
-            gemm.strassens_algo_cpu(A, B, C4, m, true, false);
-            cpu_str+= gemm.getExecTime("strassens_cpu");
+    //  }
+    //  printf("Checking output with serial...");
+    // compare_matrices(C1, C3, m, p);
+        /*
+        if (std::is_floating_point<testType>::value) {
+            printf("Checking output with gemm...");
+            compare_matrices(C0, C3, m, p);
         }
-        printf("[CPU Strassens Winograd Variant] matrix multiplication time for %d iterations: %f secs\n", iter, cpu_str);
+        */
 
-        printf("Checking output with serial...");
-        compare_matrices(C1, C4, m, p);
+        if (m == n && n == p && m == p) {
+    //     for (int i = 0; i < iter; i++) {
+                gemm.strassens_algo_cpu(A, B, C4, m, true, false);
+                cpu_str+= gemm.getExecTime("strassens_cpu");
+        //   }
+        // printf("Checking output with serial...");
+            //compare_matrices(C1, C4, m, p);
+        }
     }
+    compare_matrices(C1, C2, m, p);
+    compare_matrices(C1, C3, m, p);
+    compare_matrices(C1, C4, m, p);
    // print_matrix(C3, m, p);
    // printf("Speed-up due to cublas gemm: %f\n", serial/gemmtime);
+
+
+    printf("[Serial] matrix multiplication time for %d iterations: %f secs\n", iter, serial);
+    printf("[CPU unrolled] matrix multiplication time for %d iterations: %f secs\n", iter, cpu_ur);
+    printf("[GPU unrolled] matrix multiplication time for %d iterations: %f secs\n", iter, gpu_ur);
+    printf("[CPU Strassens Winograd Variant] matrix multiplication time for %d iterations: %f secs\n", iter, cpu_str);
     printf("Speed-up due to CPU unrolling: %f\n", serial/cpu_ur);
     printf("Speed-up due to GPU unrolling: %f\n", serial/gpu_ur);
     printf("Speed-up due to CPU Strassens: %f\n", serial/cpu_str);

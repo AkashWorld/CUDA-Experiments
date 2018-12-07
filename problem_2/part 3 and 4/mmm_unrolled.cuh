@@ -16,6 +16,10 @@
 
 using namespace std::chrono;
 
+#ifndef NUM_UNROLL
+    #define NUM_UNROLL 2
+#endif
+
 //Prints matrix
 template <typename T>
 void print_matrix(T *A, size_t m, size_t n) {
@@ -29,16 +33,35 @@ void print_matrix(T *A, size_t m, size_t n) {
     printf("\n");
 }
 
+
 //Unrolled matrix multiplication in the GPU (performs C := C + A*B)
-template <typename T>
+template <int unrollFactor, typename T>
 __global__ void matrix_multiply_unrolled(T *A, T *B, T *C, size_t m, size_t n, size_t p) {
     //extern __shared__ T temp_arr[];
     //temp_arr[threadIdx.x + blockDim.x*threadIdx.y] = 0;
     int tid1 = threadIdx.x + blockDim.x*blockIdx.x, tid2 = threadIdx.y + blockDim.y*blockIdx.y;
     T temp = 0;
-    for (int k = 0; k < n; k++) {
-        if (tid1 < m && tid2 < p) {
-           /* temp_arr[threadIdx.x + blockDim.x*threadIdx.y]*/temp += A[n*tid1 + k]*B[k*p + tid2];
+    T temp_A[NUM_UNROLL], temp_B[NUM_UNROLL];
+
+    for (int k = 0; k < n; k += NUM_UNROLL) {
+        #pragma unroll (unrollFactor)
+        for (int j = 0; j < NUM_UNROLL; j++) {
+            temp_A[j] = A[n*tid1 + k + j];
+            temp_B[j] = B[(k+j)*p + tid2];
+        }
+
+        #pragma unroll (unrollFactor)
+        for (int j = 0; j < NUM_UNROLL; j++) {
+            if (tid1 < m && tid2 < p) {
+                temp += temp_A[j]*temp_B[j];
+            }
+        }
+    }
+    if (n % NUM_UNROLL != 0) {
+        for (int k = n - (n % NUM_UNROLL); k < n; k++) {
+            if (tid1 < m && tid2 < p) {
+                temp += A[n*tid1 + k]*B[k*p + tid2];
+            }
         }
     }
     if (tid1 < m && tid2 < p) {
@@ -48,8 +71,24 @@ __global__ void matrix_multiply_unrolled(T *A, T *B, T *C, size_t m, size_t n, s
 
 //Strassens algorithm in GPU
 template <typename T>
-__global__ void strassens_algo() {
-    
+__global__ void strassens_algo(T *A11, T *A12, T *A21, T *A22, T *B11, T *B12, T *B21, T *B22, T *C11, T *C12, T *C21, T *C22, T *T1, T *T2, size_t n_) {
+    int n = n_/2;
+    int tid1 = threadIdx.x + blockDim.x*blockIdx.x, tid2 = threadIdx.y + blockDim.y*blockIdx.y;
+    int tid = tid1*n + tid2;
+    T temp = 0;
+    if (tid < n_) {
+        T1[tid] = A11[tid] - A21[tid];
+    } else {
+        T2[tid] = B22[tid] - B12[tid];
+    }
+    //Unrolled multiplication
+    for (int k = 0; k < n; k++) {
+        temp += T1[n*tid1 + k]*T2[k*n + tid2];
+    }
+    C11[tid] = temp;
+
+
+
 }
 
 template <typename T>
@@ -104,7 +143,7 @@ public:
         }
     }
 
-    //Performs unrolled matrix multiplication in the CPU
+    //Performs unrolled matrix multiplication in the CPU (4 output elements are calculated for each iteration)
     int matrix_multiply_unrolled_cpu(T *A, T *B, T *C, size_t m, size_t n, size_t p, bool t = false, bool v = false) {
         T t11 = 0, t12 = 0, t21 = 0, t22 = 0;//, a11, a12, a21, a22, b11, b12, b21, b22;
         if (t == true) {
@@ -179,7 +218,7 @@ public:
             start = high_resolution_clock::now();
         }
         dim3 gridDims(block_x, block_y), blockDims(thread_x, thread_y);
-        matrix_multiply_unrolled<< <gridDims, blockDims>> >(d_A, d_B, d_C, m, n, p);
+        matrix_multiply_unrolled<NUM_UNROLL><< <gridDims, blockDims>> >(d_A, d_B, d_C, m, n, p);
         cudaDeviceSynchronize();
         if (t == true) {
             finish = high_resolution_clock::now();
@@ -304,7 +343,9 @@ public:
         } else if (type == "gemm") {
             return gemm_time;
         } else if (type == "strassens_cpu") {
-            return str_cpu;            
+            return str_cpu;
+        } else if (type == "strassens_gpu") {
+            return str_gpu;        
         } else {
             printf("Does not exist...\n");
             return -1;
@@ -335,10 +376,6 @@ public:
         C21 = (T *)malloc((n/2)*(n/2)*sizeof(*C21));
         C22 = (T *)malloc((n/2)*(n/2)*sizeof(*C22));
 
-        if (t == true) {
-            start = high_resolution_clock::now();
-        }
-
         //Storing parts of input matrices in temporary matrices
         for (int i = 0; i < n/2; i++) {
             for (int j = 0; j < n/2; j++) {
@@ -353,6 +390,9 @@ public:
             }
         }
 
+        if (t == true) {
+            start = high_resolution_clock::now();
+        }
         //Implementation starts
         sub_mat(A11, A21, T1, n/2, n/2);
         sub_mat(B22, B12, T2, n/2, n/2);
@@ -392,7 +432,7 @@ public:
             finish = high_resolution_clock::now();
             str_cpu = duration_cast<duration<double>>(finish - start).count();
             if (v == true) {
-                printf("GPU MM Multiply Unrolled Time: %f sec(s)\n\n", str_cpu);
+                printf("CPU Strassen-Winograd Algorithm: %f sec(s)\n\n", str_cpu);
             }
         }
 
