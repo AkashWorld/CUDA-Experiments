@@ -11,10 +11,35 @@ using namespace std;
 
 
 void loop(bool* visited, queue<int> q);
+void recursive(bool* visited, queue<int> q);
 
 int** mat;
 int v;
 int e;
+
+void recursive(bool* visited, queue<int> q) {
+	int i;
+
+	if (!q.empty()) {
+		int i = q.front();
+		cout << q.front() << " ";
+		q.pop();
+
+
+		for (int j = 0; j<v; j++) {
+			if (mat[i][j] && !visited[j]) {
+				//cout << endl << i << j << endl;
+				visited[j] = true;
+				q.push(j);
+			}
+		}
+
+	recursive(visited, q);
+
+	}
+
+
+}
 
 void loop(bool* visited, queue<int> q) {
 	int i;
@@ -141,7 +166,7 @@ int main(int arg, char** argv) {
 	}
 	
 	if (flag == 2) {
-
+		recursive(visited, q);
 	}
 	return 0;
 	
