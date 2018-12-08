@@ -18,7 +18,11 @@ void compare_matrices(T *A, T *B, size_t m, size_t n) {
     float temp = 0;
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
+            float prev_temp = temp;
             temp += (float)(A[j + n*i] - B[j + n*i]) * (A[j + n*i] - B[j + n*i]);
+            if (temp - prev_temp > 0.1) {
+                std::cout << "Matrix 1: " << A[j + n*i] << ", " << i << ", " << j << ", Matrix 2: " << B[j + n*i] << "\n"; 
+            }
             /*
             if (fabs((float)(A[j + n*i] - B[j + n*i])) > 0.1) {
                 printf("Matrices not equal!\n");
@@ -45,7 +49,7 @@ int main(int argc, char* argv[]) {
 
     size_t m = 100, n = 100, p = 100;
     int iter = 10;
-    double serial = 0, cpu_ur = 0, gpu_ur = 0, gemmtime = 0, cpu_str = 0;
+    double serial = 0, cpu_ur = 0, gpu_ur = 0, gemmtime = 0, gpu_str = 0;
 
     //For different types of argument inputs
     //Can provide all dimensions for an MxN and an NxP matrix with [./main 100 200 300]
@@ -116,7 +120,7 @@ int main(int argc, char* argv[]) {
     }
     */
     //Print output matrix and sets it to 0
-  //  print_matrix(C1, m, p);
+   // print_matrix(C1, m, p);
 
  //   for (int i = 0; i < iter; i++) {
         gemm.matrix_multiply_unrolled_cpu(A, B, C2, m, n, p, true, false);
@@ -146,15 +150,19 @@ int main(int argc, char* argv[]) {
         }
         */
 
+
         if (m == n && n == p && m == p) {
     //     for (int i = 0; i < iter; i++) {
-                gemm.strassens_algo_cpu(A, B, C4, m, true, false);
-                cpu_str+= gemm.getExecTime("strassens_cpu");
+                gemm.strassens_algo_gpu(A, B, C4, m, true, false);
+                gpu_str+= gemm.getExecTime("strassens_gpu");
         //   }
         // printf("Checking output with serial...");
             //compare_matrices(C1, C4, m, p);
+           // print_matrix(C3, m, p);
         }
+        
     }
+    
     compare_matrices(C1, C2, m, p);
     compare_matrices(C1, C3, m, p);
     compare_matrices(C1, C4, m, p);
@@ -165,10 +173,10 @@ int main(int argc, char* argv[]) {
     printf("[Serial] matrix multiplication time for %d iterations: %f secs\n", iter, serial);
     printf("[CPU unrolled] matrix multiplication time for %d iterations: %f secs\n", iter, cpu_ur);
     printf("[GPU unrolled] matrix multiplication time for %d iterations: %f secs\n", iter, gpu_ur);
-    printf("[CPU Strassens Winograd Variant] matrix multiplication time for %d iterations: %f secs\n", iter, cpu_str);
+    printf("[GPU Strassens Winograd Variant] matrix multiplication time for %d iterations: %f secs\n", iter, gpu_str);
     printf("Speed-up due to CPU unrolling: %f\n", serial/cpu_ur);
     printf("Speed-up due to GPU unrolling: %f\n", serial/gpu_ur);
-    printf("Speed-up due to CPU Strassens: %f\n", serial/cpu_str);
+    printf("Speed-up due to GPU Strassens: %f\n", serial/gpu_str);
 
 
     //Freeing allocated memory
@@ -178,6 +186,7 @@ int main(int argc, char* argv[]) {
     free(C1);
     free(C2);
     free(C3);
+    free(C4);
 
     //std::getchar();
     return 0;
