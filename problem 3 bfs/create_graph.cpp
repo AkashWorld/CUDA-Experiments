@@ -44,10 +44,10 @@ int main(int arg, char** argv)
 	}
 	int max = x*x - x - 1;
 	int e = rand() % max + 1;  // max edge? directed?
+	
 	//cout << e;
-	file_ << "creating graph with: " << x << " vertices " << e << " edges" << endl;
-	file_ << x << endl;
-	file_ << e << endl;
+	cout << "creating graph with: " << x << " vertices " << e << " edges in graph.txt" << endl;
+	
 	for (int k = 0; k < e; k++) {
 		i = rand() % x;
 		j = rand() % x;
