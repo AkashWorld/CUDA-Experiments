@@ -6,50 +6,20 @@
 #include <iomanip>
 #include <string.h>
 #include <chrono>
+#include <vector>
 #include <type_traits>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
 typedef float testType;
 
-//Compare matrices
-template <typename T>
-void compare_matrices(T *A, T *B, size_t m, size_t n) {
-    float temp = 0;
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            float prev_temp = temp;
-            temp += (float)(A[j + n*i] - B[j + n*i]) * (A[j + n*i] - B[j + n*i]);
-            if (temp - prev_temp > 0.1) {
-                std::cout << "Matrix 1: " << A[j + n*i] << ", " << i << ", " << j << ", Matrix 2: " << B[j + n*i] << "\n"; 
-            }
-            /*
-            if (fabs((float)(A[j + n*i] - B[j + n*i])) > 0.1) {
-                printf("Matrices not equal!\n");
-                return;
-            }
-            */
-        }
-    }
-    printf("MSE: %f\n", temp/(float)(m*n));
-    //printf("Matrices equal.\n");
-}
-
-//Generates random matrix
-template <typename T>
-void gen_rand_mat(T *Mat, size_t m, size_t n) {
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            Mat[j + n*i] = (T)((2*((float)rand()/(float)RAND_MAX)-1) * 10);
-        }
-    }
-}
-
 int main(int argc, char* argv[]) {
 
     size_t m = 100, n = 100, p = 100;
     int iter = 10;
-    double serial = 0, cpu_ur = 0, gpu_ur = 0, gemmtime = 0, gpu_str = 0;
+    double serial = 0, cpu_ur = 0, gemmtime = 0, gpu_str = 0;
+    std::vector<double> gpu_ur(8, 0);
+    std::vector<double> gpu_ur_od(8, 0);
 
     //For different types of argument inputs
     //Can provide all dimensions for an MxN and an NxP matrix with [./main 100 200 300]
@@ -122,10 +92,9 @@ int main(int argc, char* argv[]) {
     //Print output matrix and sets it to 0
    // print_matrix(C1, m, p);
 
- //   for (int i = 0; i < iter; i++) {
         gemm.matrix_multiply_unrolled_cpu(A, B, C2, m, n, p, true, false);
+      //  compare_matrices(C1, C2, m, p);
         cpu_ur += gemm.getExecTime("cpu_unrolled");
-  //  }
     /*
     if (std::is_floating_point<testType>::value) {
         printf("Checking output with gemm...");
@@ -137,9 +106,117 @@ int main(int argc, char* argv[]) {
     //Print output matrix and sets it to 0
    // print_matrix(C2, m, p);
 
-  //  for (int i = 0; i < iter; i++) {
-        gemm.matrix_multiply_unrolled_gpu(A, B, C3, m, n, p, true, false);
-        gpu_ur += gemm.getExecTime("gpu_unrolled");
+        //Two dinemstion unroll
+        memset(C3, 0, m*p*sizeof(*C3));
+        gemm.matrix_multiply_unrolled_gpu<1>(A, B, C3, m, n, p, true, false);
+        if (compare_matrices(C1, C3, m, p) == -1) {
+            std::cerr << "Err with 1 loop unroll\n";
+        }
+        gpu_ur[0] += gemm.getExecTime("gpu_unrolled");
+        memset(C3, 0, m*p*sizeof(*C3));
+        gemm.matrix_multiply_unrolled_gpu<2>(A, B, C3, m, n, p, true, false);
+        if (compare_matrices(C1, C3, m, p) == -1) {
+            std::cerr << "Err with 2 loop unroll\n";
+        }
+        gpu_ur[1] += gemm.getExecTime("gpu_unrolled");
+        memset(C3, 0, m*p*sizeof(*C3));
+        gemm.matrix_multiply_unrolled_gpu<4>(A, B, C3, m, n, p, true, false);
+        if (compare_matrices(C1, C3, m, p) == -1) {
+            std::cerr << "Err with 4 loop unroll\n";
+        }
+        gpu_ur[2] += gemm.getExecTime("gpu_unrolled");
+        
+        memset(C3, 0, m*p*sizeof(*C3));
+        gemm.matrix_multiply_unrolled_gpu<8>(A, B, C3, m, n, p, true, false);
+        if (compare_matrices(C1, C3, m, p) == -1) {
+            std::cerr << "Err with 8 loop unroll\n";
+        }
+        gpu_ur[3] += gemm.getExecTime("gpu_unrolled");
+        memset(C3, 0, m*p*sizeof(*C3));
+        gemm.matrix_multiply_unrolled_gpu<16>(A, B, C3, m, n, p, true, false);
+      //  print_matrix(C3, m, p);
+        if (compare_matrices(C1, C3, m, p) == -1) {
+            std::cerr << "Err with 16 loop unroll\n";
+        }
+        gpu_ur[4] += gemm.getExecTime("gpu_unrolled");
+        
+        memset(C3, 0, m*p*sizeof(*C3));
+        gemm.matrix_multiply_unrolled_gpu<32>(A, B, C3, m, n, p, true, false);
+     //   print_matrix(C3, m, p);
+        if (compare_matrices(C1, C3, m, p) == -1) {
+            std::cerr << "Err with 32 loop unroll\n";
+        }
+        gpu_ur[5] += gemm.getExecTime("gpu_unrolled");
+        
+        memset(C3, 0, m*p*sizeof(*C3));
+        gemm.matrix_multiply_unrolled_gpu<64>(A, B, C3, m, n, p, true, false);
+        if (compare_matrices(C1, C3, m, p) == -1) {
+            std::cerr << "Err with 64 loop unroll\n";
+        }
+        gpu_ur[6] += gemm.getExecTime("gpu_unrolled");
+
+        memset(C3, 0, m*p*sizeof(*C3));
+        gemm.matrix_multiply_unrolled_gpu<128>(A, B, C3, m, n, p, true, false);
+        if (compare_matrices(C1, C3, m, p) == -1) {
+            std::cerr << "Err with 128 loop unroll\n";
+        }
+        gpu_ur[7] += gemm.getExecTime("gpu_unrolled");
+
+        //Single dimension unroll
+        memset(C3, 0, m*p*sizeof(*C3));
+        gemm.matrix_multiply_unrolled_gpu_one_dim<1>(A, B, C3, m, n, p, true, false);
+        if (compare_matrices(C1, C3, m, p) == -1) {
+            std::cerr << "Err with 1 loop unroll\n";
+        }
+        gpu_ur_od[0] += gemm.getExecTime("gpu_unrolled");
+        memset(C3, 0, m*p*sizeof(*C3));
+        gemm.matrix_multiply_unrolled_gpu_one_dim<2>(A, B, C3, m, n, p, true, false);
+        if (compare_matrices(C1, C3, m, p) == -1) {
+            std::cerr << "Err with 2 loop unroll\n";
+        }
+        gpu_ur_od[1] += gemm.getExecTime("gpu_unrolled");
+        memset(C3, 0, m*p*sizeof(*C3));
+        gemm.matrix_multiply_unrolled_gpu_one_dim<4>(A, B, C3, m, n, p, true, false);
+        if (compare_matrices(C1, C3, m, p) == -1) {
+            std::cerr << "Err with 4 loop unroll\n";
+        }
+        gpu_ur_od[2] += gemm.getExecTime("gpu_unrolled");
+        
+        memset(C3, 0, m*p*sizeof(*C3));
+        gemm.matrix_multiply_unrolled_gpu_one_dim<8>(A, B, C3, m, n, p, true, false);
+        if (compare_matrices(C1, C3, m, p) == -1) {
+            std::cerr << "Err with 8 loop unroll\n";
+        }
+        gpu_ur_od[3] += gemm.getExecTime("gpu_unrolled");
+        memset(C3, 0, m*p*sizeof(*C3));
+        gemm.matrix_multiply_unrolled_gpu_one_dim<16>(A, B, C3, m, n, p, true, false);
+      //  print_matrix(C3, m, p);
+        if (compare_matrices(C1, C3, m, p) == -1) {
+            std::cerr << "Err with 16 loop unroll\n";
+        }
+        gpu_ur_od[4] += gemm.getExecTime("gpu_unrolled");
+        
+        memset(C3, 0, m*p*sizeof(*C3));
+        gemm.matrix_multiply_unrolled_gpu_one_dim<32>(A, B, C3, m, n, p, true, false);
+     //   print_matrix(C3, m, p);
+        if (compare_matrices(C1, C3, m, p) == -1) {
+            std::cerr << "Err with 32 loop unroll\n";
+        }
+        gpu_ur_od[5] += gemm.getExecTime("gpu_unrolled");
+        
+        memset(C3, 0, m*p*sizeof(*C3));
+        gemm.matrix_multiply_unrolled_gpu_one_dim<64>(A, B, C3, m, n, p, true, false);
+        if (compare_matrices(C1, C3, m, p) == -1) {
+            std::cerr << "Err with 64 loop unroll\n";
+        }
+        gpu_ur_od[6] += gemm.getExecTime("gpu_unrolled");
+
+        memset(C3, 0, m*p*sizeof(*C3));
+        gemm.matrix_multiply_unrolled_gpu_one_dim<128>(A, B, C3, m, n, p, true, false);
+        if (compare_matrices(C1, C3, m, p) == -1) {
+            std::cerr << "Err with 128 loop unroll\n";
+        }
+        gpu_ur_od[7] += gemm.getExecTime("gpu_unrolled");
     //  }
     //  printf("Checking output with serial...");
     // compare_matrices(C1, C3, m, p);
@@ -152,31 +229,61 @@ int main(int argc, char* argv[]) {
 
 
         if (m == n && n == p && m == p) {
-    //     for (int i = 0; i < iter; i++) {
-                gemm.strassens_algo_gpu(A, B, C4, m, true, false);
-                gpu_str+= gemm.getExecTime("strassens_gpu");
-        //   }
-        // printf("Checking output with serial...");
-            //compare_matrices(C1, C4, m, p);
-           // print_matrix(C3, m, p);
+            gemm.strassens_algo_gpu<1>(A, B, C4, m, true, false);
+        //    compare_matrices(C1, C4, m, p);
+            gpu_str += gemm.getExecTime("strassens_gpu");
+            // print_matrix(C3, m, p);
         }
         
     }
     
-    compare_matrices(C1, C2, m, p);
-    compare_matrices(C1, C3, m, p);
-    compare_matrices(C1, C4, m, p);
    // print_matrix(C3, m, p);
    // printf("Speed-up due to cublas gemm: %f\n", serial/gemmtime);
 
 
     printf("[Serial] matrix multiplication time for %d iterations: %f secs\n", iter, serial);
     printf("[CPU unrolled] matrix multiplication time for %d iterations: %f secs\n", iter, cpu_ur);
-    printf("[GPU unrolled] matrix multiplication time for %d iterations: %f secs\n", iter, gpu_ur);
+    printf("Two dimension unroll:\n");
+    printf("[GPU unrolled] matrix multiplication time for %d iterations and %d unrolls: %f secs\n", iter, 1, gpu_ur[0]);
+    printf("[GPU unrolled] matrix multiplication time for %d iterations and %d unrolls: %f secs\n", iter, 2, gpu_ur[1]);
+    printf("[GPU unrolled] matrix multiplication time for %d iterations and %d unrolls: %f secs\n", iter, 4, gpu_ur[2]);
+    printf("[GPU unrolled] matrix multiplication time for %d iterations and %d unrolls: %f secs\n", iter, 8, gpu_ur[3]);
+    printf("[GPU unrolled] matrix multiplication time for %d iterations and %d unrolls: %f secs\n", iter, 16, gpu_ur[4]);
+    printf("[GPU unrolled] matrix multiplication time for %d iterations and %d unrolls: %f secs\n", iter, 32, gpu_ur[5]);
+    printf("[GPU unrolled] matrix multiplication time for %d iterations and %d unrolls: %f secs\n", iter, 64, gpu_ur[6]);
+    printf("[GPU unrolled] matrix multiplication time for %d iterations and %d unrolls: %f secs\n", iter, 128, gpu_ur[7]);
+    printf("One dimension unroll:\n");
+    printf("[GPU unrolled] matrix multiplication time for %d iterations and %d unrolls: %f secs\n", iter, 1, gpu_ur_od[0]);
+    printf("[GPU unrolled] matrix multiplication time for %d iterations and %d unrolls: %f secs\n", iter, 2, gpu_ur_od[1]);
+    printf("[GPU unrolled] matrix multiplication time for %d iterations and %d unrolls: %f secs\n", iter, 4, gpu_ur_od[2]);
+    printf("[GPU unrolled] matrix multiplication time for %d iterations and %d unrolls: %f secs\n", iter, 8, gpu_ur_od[3]);
+    printf("[GPU unrolled] matrix multiplication time for %d iterations and %d unrolls: %f secs\n", iter, 16, gpu_ur_od[4]);
+    printf("[GPU unrolled] matrix multiplication time for %d iterations and %d unrolls: %f secs\n", iter, 32, gpu_ur_od[5]);
+    printf("[GPU unrolled] matrix multiplication time for %d iterations and %d unrolls: %f secs\n", iter, 64, gpu_ur_od[6]);
+    printf("[GPU unrolled] matrix multiplication time for %d iterations and %d unrolls: %f secs\n", iter, 128, gpu_ur_od[7]);
+
+
     printf("[GPU Strassens Winograd Variant] matrix multiplication time for %d iterations: %f secs\n", iter, gpu_str);
     printf("Speed-up due to CPU unrolling: %f\n", serial/cpu_ur);
-    printf("Speed-up due to GPU unrolling: %f\n", serial/gpu_ur);
-    printf("Speed-up due to GPU Strassens: %f\n", serial/gpu_str);
+    printf("Two dimension unroll:\n");
+    printf("Speed-up due to GPU unrolling with %d unrolls: %f\n", 1, serial/gpu_ur[0]);
+    printf("Speed-up due to GPU unrolling with %d unrolls: %f\n", 2, serial/gpu_ur[1]);
+    printf("Speed-up due to GPU unrolling with %d unrolls: %f\n", 4, serial/gpu_ur[2]);
+    printf("Speed-up due to GPU unrolling with %d unrolls: %f\n", 8, serial/gpu_ur[3]);
+    printf("Speed-up due to GPU unrolling with %d unrolls: %f\n", 16, serial/gpu_ur[4]);
+    printf("Speed-up due to GPU unrolling with %d unrolls: %f\n", 32, serial/gpu_ur[5]);
+    printf("Speed-up due to GPU unrolling with %d unrolls: %f\n", 64, serial/gpu_ur[6]);
+    printf("Speed-up due to GPU unrolling with %d unrolls: %f\n", 128, serial/gpu_ur[7]);
+    printf("One dimension unroll:\n");
+    printf("Speed-up due to GPU unrolling with %d unrolls: %f\n", 1, serial/gpu_ur_od[0]);
+    printf("Speed-up due to GPU unrolling with %d unrolls: %f\n", 2, serial/gpu_ur_od[1]);
+    printf("Speed-up due to GPU unrolling with %d unrolls: %f\n", 4, serial/gpu_ur_od[2]);
+    printf("Speed-up due to GPU unrolling with %d unrolls: %f\n", 8, serial/gpu_ur_od[3]);
+    printf("Speed-up due to GPU unrolling with %d unrolls: %f\n", 16, serial/gpu_ur_od[4]);
+    printf("Speed-up due to GPU unrolling with %d unrolls: %f\n", 32, serial/gpu_ur_od[5]);
+    printf("Speed-up due to GPU unrolling with %d unrolls: %f\n", 64, serial/gpu_ur_od[6]);
+    printf("Speed-up due to GPU unrolling with %d unrolls: %f\n", 128, serial/gpu_ur_od[7]);
+    printf("Speed-up for GPU Strassen Winograd Algorithm: %f\n", serial/gpu_str);
 
 
     //Freeing allocated memory
