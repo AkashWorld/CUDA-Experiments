@@ -229,8 +229,9 @@ public:
         thread_y = std::min((int)p, (int)floor(sqrt(threads_per_block)));
         block_x = (int)ceil((float)((int)ceil((float)m/(float)num_unroll))/(float)thread_x);
         block_y = (int)ceil((float)p/(float)thread_y);
+        dim3 gridDims(block_x, block_y), blockDims(thread_x, thread_y);
 
-        //std::cout << thread_x << "," << thread_y << "," << block_x << "," << block_y << "," << ((int)ceil((float)m/(float)num_unroll)) << "\n";
+      //  std::cout << thread_x << "," << thread_y << "," << block_x << "," << block_y << "," << ((int)ceil((float)m/(float)num_unroll)) << "\n";
 
         //Initializing arrays for GPU
         T *d_A, *d_B, *d_C;
@@ -248,8 +249,7 @@ public:
         if (t == true) {
             start = high_resolution_clock::now();
         }
-        dim3 gridDims(block_x, block_y), blockDims(thread_x, thread_y);
-        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims, blockDims/*, num_unroll*thread_x*thread_y*sizeof(T)*/>> >(d_A, d_B, d_C, m, n, p);
+        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims, blockDims>> >(d_A, d_B, d_C, m, n, p);
         cudaDeviceSynchronize();
         if (t == true) {
             finish = high_resolution_clock::now();
@@ -278,10 +278,11 @@ public:
         cudaGetDeviceProperties(&devProp, 0);
         int threads_per_block  = devProp.maxThreadsPerBlock;
         int thread_x, thread_y, block_x, block_y;
-        thread_x = std::min((int)ceil(m/(float)num_unroll), std::min((int)floor(sqrt(threads_per_block)), 16));
-        thread_y = std::min((int)ceil(p/(float)num_unroll), std::min((int)floor(sqrt(threads_per_block)), 16));
+        thread_x = std::min((int)ceil(m/(float)num_unroll), (int)floor(sqrt(threads_per_block)));
+        thread_y = std::min((int)ceil(p/(float)num_unroll), (int)floor(sqrt(threads_per_block)));
         block_x = (int)ceil((float)((int)ceil(m/(float)num_unroll))/(float)thread_x);
         block_y = (int)ceil((float)((int)ceil(p/(float)num_unroll))/(float)thread_y);
+        dim3 gridDims(block_x, block_y), blockDims(thread_x, thread_y);
 
         //Initializing arrays for GPU
         T *d_A, *d_B, *d_C;
@@ -299,8 +300,7 @@ public:
         if (t == true) {
             start = high_resolution_clock::now();
         }
-        dim3 gridDims(block_x, block_y), blockDims(thread_x, thread_y);
-        matrix_multiply_unrolled<num_unroll><< <gridDims, blockDims/*, num_unroll*num_unroll*thread_x*thread_y*sizeof(T)*/>> >(d_A, d_B, d_C, m, n, p);
+        matrix_multiply_unrolled<num_unroll><< <gridDims, blockDims>> >(d_A, d_B, d_C, m, n, p);
         cudaDeviceSynchronize();
         if (t == true) {
             finish = high_resolution_clock::now();
@@ -436,12 +436,17 @@ public:
         cudaDeviceProp devProp;
         cudaGetDeviceProperties(&devProp, 0);
         int threads_per_block  = devProp.maxThreadsPerBlock;
-        int thread_x, thread_y, block_x, block_y;
-        thread_x = std::min((int)ceil((n/2)/(float)num_unroll), std::min((int)floor(sqrt(threads_per_block)), 16));
-        thread_y = std::min((int)ceil((n/2)/(float)num_unroll), std::min((int)floor(sqrt(threads_per_block)), 16));
-        block_x = (int)ceil((float)((int)ceil((n/2)/(float)num_unroll))/(float)thread_x);
-        block_y = (int)(ceil((float)((int)ceil((n/2)/(float)num_unroll))/(float)thread_y));
-        dim3 gridDims(block_x, block_y), blockDims(thread_x, thread_y);
+        int thread_x, thread_y, block_x, block_y, thread_x_mul, thread_y_mul, block_x_mul, block_y_mul;
+        thread_x = std::min((int)(n/2), (int)floor(sqrt(threads_per_block)));
+        thread_y = std::min((int)(n/2), (int)floor(sqrt(threads_per_block)));
+        block_x = (int)ceil((float)(n/2)/(float)thread_x);
+        block_y = (int)ceil((float)(n/2)/(float)thread_y);
+        thread_x_mul = std::min((int)ceil((float)(n/2)/(float)num_unroll), (int)floor(sqrt(threads_per_block)));
+        thread_y_mul = std::min((int)(n/2), (int)floor(sqrt(threads_per_block)));
+        block_x_mul = (int)ceil((float)((int)ceil((float)(n/2)/(float)num_unroll))/(float)thread_x_mul);
+        block_y_mul = (int)ceil((float)(n/2)/(float)thread_y_mul);
+        dim3 gridDims(block_x, block_y), blockDims(thread_x, thread_y), gridDims2(block_x_mul, block_y_mul), blockDims2(thread_x_mul, thread_y_mul);
+       // std::cout << thread_x << "," << thread_y << "," << block_x << "," << block_y << "\n";
 
         //Initializing sub-arrays for GPU
         T *A11, *A12, *A21, *A22, *B11, *B12, *B21, *B22, *C11, *C12, *C21, *C22, *T1, *T2;
@@ -481,25 +486,25 @@ public:
         //Implementation starts
         sub_mat_gpu<< <gridDims, blockDims>> >(A11, A21, T1, n/2);
         sub_mat_gpu<< <gridDims, blockDims>> >(B22, B12, T2, n/2);
-        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims, blockDims>> >(T1, T2, C21, n/2, n/2, n/2);
+        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims2, blockDims2>> >(T1, T2, C21, n/2, n/2, n/2);
         add_mat_gpu<< <gridDims, blockDims>> >(A21, A22, T1, n/2);
         sub_mat_gpu<< <gridDims, blockDims>> >(B12, B11, T2, n/2);
-        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims, blockDims>> >(T1, T2, C22, n/2, n/2, n/2);
+        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims2, blockDims2>> >(T1, T2, C22, n/2, n/2, n/2);
         sub_mat_gpu<< <gridDims, blockDims>> >(T1, A11, T1, n/2);
         sub_mat_gpu<< <gridDims, blockDims>> >(B22, T2, T2, n/2);
-        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims, blockDims>> >(T1, T2, C11, n/2, n/2, n/2);
+        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims2, blockDims2>> >(T1, T2, C11, n/2, n/2, n/2);
         sub_mat_gpu<< <gridDims, blockDims>> >(A12, T1, T1, n/2);
-        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims, blockDims>> >(T1, B22, C12, n/2, n/2, n/2);
+        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims2, blockDims2>> >(T1, B22, C12, n/2, n/2, n/2);
         add_mat_gpu<< <gridDims, blockDims>> >(C22, C12, C12, n/2);
-        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims, blockDims>> >(A11, B11, T1, n/2, n/2, n/2);
+        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims2, blockDims2>> >(A11, B11, T1, n/2, n/2, n/2);
         add_mat_gpu<< <gridDims, blockDims>> >(C11, T1, C11, n/2);
         add_mat_gpu<< <gridDims, blockDims>> >(C11, C12, C12, n/2);
         add_mat_gpu<< <gridDims, blockDims>> >(C11, C21, C11, n/2);
         sub_mat_gpu<< <gridDims, blockDims>> >(T2, B21, T2, n/2);
-        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims, blockDims>> >(A22, T2, C21, n/2, n/2, n/2);
+        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims2, blockDims2>> >(A22, T2, C21, n/2, n/2, n/2);
         sub_mat_gpu<< <gridDims, blockDims>> >(C11, C21, C21, n/2);
         add_mat_gpu<< <gridDims, blockDims>> >(C11, C22, C22, n/2);
-        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims, blockDims>> >(A12, B21, C11, n/2, n/2, n/2);
+        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims2, blockDims2>> >(A12, B21, C11, n/2, n/2, n/2);
         add_mat_gpu<< <gridDims, blockDims>> >(T1, C11, C11, n/2);
         //Implementation finished
         cudaDeviceSynchronize();
