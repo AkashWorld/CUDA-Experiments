@@ -4,7 +4,7 @@
 #include <cassert>
 #include <logger.h>
 #include <limits>
-#include "matrix.cu"
+#include "matrix.cuh"
 
 template <typename T>
 class Matrix
@@ -60,7 +60,7 @@ public:
 	/*Standard, least efficient*/
 	Matrix operator*(Matrix &rh_matrix)
 	{
-		if (this->row != rh_matrix.col || this->col != rh_matrix.row ||
+		if (this->col != rh_matrix.row ||
 			this->is_empty() || rh_matrix.is_empty())
 		{
 			debug_logln("Invalid matrix input.");
@@ -148,7 +148,7 @@ public:
 		}
 		return true;
 	}
-	void print_dec()
+	void print()
 	{
 		err_logln("Please implement a type specific print function.%s", "");
 	}
@@ -158,13 +158,14 @@ public:
 	}
 };
 
+
 template <>
 Matrix<float> Matrix<float>::cuda_multiply(Matrix<float> &rh_matrix)
 {
-	if (this->row != rh_matrix.col || this->col != rh_matrix.row ||
+	if (this->col != rh_matrix.row ||
 		this->is_empty() || rh_matrix.is_empty())
 	{
-		debug_logln("Invalid matrix input.");
+		debug_logln("Invalid matrix input (both matrices are empty!).");
 		return Matrix(0, 0);
 	}
 	const std::size_t row = this->row;
@@ -182,7 +183,7 @@ Matrix<float> Matrix<float>::cuda_multiply(Matrix<float> &rh_matrix)
 template <>
 Matrix<float> Matrix<float>::cublas_multiply(Matrix<float> &rh_matrix)
 {
-	if (this->row != rh_matrix.col || this->col != rh_matrix.row ||
+	if (this->col != rh_matrix.row ||
 		this->is_empty() || rh_matrix.is_empty())
 	{
 		debug_logln("Invalid matrix input.");
@@ -234,7 +235,7 @@ Matrix<float> Matrix<float>::generate_random_matrix(std::size_t row, std::size_t
 }
 
 template <>
-void Matrix<unsigned int>::print_dec()
+void Matrix<unsigned int>::print()
 {
 	for (std::size_t i = 0; i < row; ++i)
 	{
@@ -242,6 +243,24 @@ void Matrix<unsigned int>::print_dec()
 		for (std::size_t j = 0; j < col; ++j)
 		{
 			printf(BOLD(" %u"), (*this)[i][j]);
+			if (j != col - 1)
+			{
+				printf(BOLD(",%s"), "");
+			}
+		}
+		printf(BOLD("%s]\n"), "");
+	}
+}
+
+template <>
+void Matrix<float>::print()
+{
+	for (std::size_t i = 0; i < row; ++i)
+	{
+		printf(BOLD("[%s"), "");
+		for (std::size_t j = 0; j < col; ++j)
+		{
+			printf(BOLD(" %f"), (*this)[i][j]);
 			if (j != col - 1)
 			{
 				printf(BOLD(",%s"), "");

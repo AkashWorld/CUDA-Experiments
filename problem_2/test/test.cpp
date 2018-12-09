@@ -4,7 +4,7 @@
 #include <unordered_set>
 #include "../src/matrix.h"
 
-TEST_CASE("M*N Matrix", "[Matrix]")
+TEST_CASE("Naive M*N Matrix", "[Matrix]")
 {
     SECTION("Operation Test")
     {
@@ -24,7 +24,6 @@ TEST_CASE("M*N Matrix", "[Matrix]")
         REQUIRE(!final_mat.is_empty());
         REQUIRE(final_mat[0][0] == mat_0[0][0] * mat_1[0][0] + mat_0[0][1] * mat_1[1][0] + mat_0[0][2] * mat_1[2][0]);
         REQUIRE(final_mat[1][1] == mat_0[1][0] * mat_1[0][1] + mat_0[1][1] * mat_1[1][1] + mat_0[1][2] * mat_1[2][1]);
-        final_mat.print_dec();
     }
     SECTION("Visual Random Generator Test")
     {
@@ -36,17 +35,25 @@ TEST_CASE("M*N Matrix", "[Matrix]")
         }
         REQUIRE(number_counter.size() > 1);
     }
-    SECTION("CPU Block Multiplication Test, NxN")
-    {
-        auto mat_1 = Matrix<unsigned int>::generate_random_matrix(20, 20);
-        auto mat_2 = Matrix<unsigned int>::generate_random_matrix(20, 20);
-        auto normal_result = mat_1 * mat_2;
-        auto result = mat_1.block_multiply(mat_2);
-        REQUIRE(!result.is_empty());
-        REQUIRE(result.get_row_size() == 20);
-        REQUIRE(result.get_col_size() == 20);
-        REQUIRE(normal_result.is_equal(result));
-    }
+}
+
+TEST_CASE("Block MxN Multiplication", "[Block]")
+{
+	SECTION("CPU Block Multiplication Test, NxN")
+	{
+		auto mat_1 = Matrix<unsigned int>::generate_random_matrix(20, 20);
+		auto mat_2 = Matrix<unsigned int>::generate_random_matrix(20, 20);
+		auto normal_result = mat_1 * mat_2;
+		auto result = mat_1.block_multiply(mat_2);
+		REQUIRE(!result.is_empty());
+		REQUIRE(result.get_row_size() == 20);
+		REQUIRE(result.get_col_size() == 20);
+		REQUIRE(normal_result.is_equal(result));
+	}
+}
+
+TEST_CASE("CUDA MxN Multiplication", "[CUDA]")
+{
 	SECTION("CUDA accelerated Multiplication Test")
 	{
 		float arr_0[6] = { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f };
@@ -55,8 +62,37 @@ TEST_CASE("M*N Matrix", "[Matrix]")
 		Matrix<float> mat_1(arr_1, 3, 2);
 		auto normal_result = mat_0 * mat_1;
 		auto cuda_result = mat_0.cuda_multiply(mat_1);
-		REQUIRE(normal_result.is_equal(cuda_result));
+		auto is_eq = normal_result.is_equal(cuda_result);
+		if (is_eq == false)
+		{
+			printf("Normal Result:\n");
+			normal_result.print();
+			printf("Cuda Result:\n");
+			cuda_result.print();
+		}
+		REQUIRE(is_eq);
 	}
+	SECTION("CUDA Accelerated Multiplication Test Large")
+	{
+
+		auto rand_0 = Matrix<float>::generate_random_matrix(500, 7500);
+		auto rand_1 = Matrix<float>::generate_random_matrix(7500, 8000);
+		auto normal_result = rand_0 * rand_1;
+		auto cuda_result = rand_0.cuda_multiply(rand_1);
+		auto is_eq = normal_result.is_equal(cuda_result);
+		if (is_eq == false)
+		{
+			printf("Normal Result:\n");
+			normal_result.print();
+			printf("Cuda Result:\n");
+			cuda_result.print();
+		}
+		REQUIRE(is_eq);
+	}
+}
+
+TEST_CASE("cuBlas MxN multiplication test", "[cuBlas]")
+{
 	SECTION("cuBLAS accelerated Multiplication Test")
 	{
 		float arr_0[6] = { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f };
@@ -65,6 +101,31 @@ TEST_CASE("M*N Matrix", "[Matrix]")
 		Matrix<float> mat_1(arr_1, 3, 2);
 		auto normal_result = mat_0 * mat_1;
 		auto cublas_result = mat_0.cublas_multiply(mat_1);
-		REQUIRE(normal_result.is_equal(cublas_result));
+		auto is_equal = normal_result.is_equal(cublas_result);
+		if (is_equal == false)
+		{
+			printf("Normal Result\n");
+			normal_result.print();
+			printf("cuBlas Result\n");
+			cublas_result.print();
+		}
+		REQUIRE(is_equal);
+	}
+	SECTION("cuBLAS Accelerated Multiplication Test Large")
+	{
+
+		auto rand_0 = Matrix<float>::generate_random_matrix(500, 7500);
+		auto rand_1 = Matrix<float>::generate_random_matrix(7500, 8000);
+		auto normal_result = rand_0 * rand_1;
+		auto cuda_result = rand_0.cublas_multiply(rand_1);
+		auto is_eq = normal_result.is_equal(cuda_result);
+		if (is_eq == false)
+		{
+			printf("Normal Result:\n");
+			normal_result.print();
+			printf("cuBlas Result:\n");
+			cuda_result.print();
+		}
+		REQUIRE(is_eq);
 	}
 }
