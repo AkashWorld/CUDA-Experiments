@@ -183,7 +183,7 @@ Matrix<float> Matrix<float>::cuda_multiply(Matrix<float> &rh_matrix)
 template <>
 Matrix<float> Matrix<float>::cublas_multiply(Matrix<float> &rh_matrix)
 {
-	if (this->row != rh_matrix.col || this->col != rh_matrix.row ||
+	if (this->col != rh_matrix.row ||
 		this->is_empty() || rh_matrix.is_empty())
 	{
 		debug_logln("Invalid matrix input.");
