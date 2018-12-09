@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
 project(MATRIX_MULTIPLICATION LANGUAGES C CXX CUDA)
-find_package(CUDA 10.0 REQUIRED)
 set (CMAKE_CXX_STANDARD 11)
 link_directories(src)
 include_directories(src libs/catch2 libs/logger)

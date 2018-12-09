@@ -71,7 +71,7 @@ float *fl_cuda_matrix_multiply(float *lh_mat, float *rh_mat,
 	matrix_multiply <<<numb_blocks, threads_per_block>>> (dev_lh_mat, dev_rh_mat, dev_res_mat, lh_row, lh_col, rh_row, rh_col);
 	error_stat = cudaMemcpy(result_matrix, dev_res_mat, size, cudaMemcpyDeviceToHost);
 	CHECK_ERR(error_stat);
-free:
+cuda_free:
 	if ((error_stat = cudaFree(dev_rh_mat)) != cudaSuccess) {
 		err_logln("Error freeing device memory! Error: %s", cudaGetErrorString(error_stat));
 	}
@@ -82,6 +82,9 @@ free:
 		err_logln("Error freeing device memory! Error: %s", cudaGetErrorString(error_stat));
 	}
 	return result_matrix;
+free:
+	free(result_matrix);
+	goto cuda_free;
 }
 
 
@@ -109,32 +112,54 @@ float *fl_cublas_matrix_multiply(float *lh_mat, float *rh_mat,
 	float *d_ret_result = NULL; 
 	float *dev_ptr_lh = NULL;
 	float *dev_ptr_rh = NULL;
-	cuda_stat = cudaMalloc(&d_ret_result, size);
-	CHECK_ERR(cuda_stat);
-	cuda_stat = cudaMalloc(&dev_ptr_lh, sizeof(float)*lh_row*lh_col);
-	CHECK_ERR(cuda_stat);
-	cuda_stat = cudaMalloc(&dev_ptr_rh, sizeof(float)*rh_row*rh_col);
-	CHECK_ERR(cuda_stat);
-	cuda_stat = cudaMemcpy(dev_ptr_lh, lh_mat, sizeof(float)*lh_row*lh_col, cudaMemcpyHostToDevice);
-	CHECK_ERR(cuda_stat);
-	cuda_stat = cudaMemcpy(dev_ptr_rh, rh_mat, sizeof(float)*rh_row*rh_col, cudaMemcpyHostToDevice);
-	CHECK_ERR(cuda_stat);
+	if ((cuda_stat = cudaMalloc(&d_ret_result, size)) != cudaSuccess) {
+			err_logln("Cuda error caught! Error: ", cudaGetErrorString(cuda_stat));
+			goto destroy;														
+	}
+	if ((cuda_stat = cudaMalloc(&dev_ptr_lh, sizeof(float)*lh_row*lh_col)) != cudaSuccess) {
+		err_logln("Cuda error caught! Error: ", cudaGetErrorString(cuda_stat));
+		cudaFree(d_ret_result);
+		goto destroy;
+	}
+	if ((cuda_stat = cudaMalloc(&dev_ptr_rh, sizeof(float)*rh_row*rh_col)) != cudaSuccess) {
+		err_logln("Cuda error caught! Error: ", cudaGetErrorString(cuda_stat));
+		cudaFree(d_ret_result);
+		cudaFree(dev_ptr_lh);
+		goto destroy;
+	}
+	if ((cuda_stat = cudaMemcpy(dev_ptr_lh, lh_mat, sizeof(float)*lh_row*lh_col, cudaMemcpyHostToDevice)) != cudaSuccess)
+	{
+		err_logln("Cuda error caught! Error: ", cudaGetErrorString(cuda_stat));
+		goto free;
+	}
+	if ((cuda_stat = cudaMemcpy(dev_ptr_rh, rh_mat, sizeof(float)*rh_row*rh_col, cudaMemcpyHostToDevice)) != cudaSuccess)
+	{
+		err_logln("Cuda error caught! Error: ", cudaGetErrorString(cuda_stat));
+		goto free;
+	}
 	float alpha = 1.0f;
 	float beta = 0.0f;
 	status = cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, rh_col, lh_row, lh_col, &alpha, dev_ptr_rh, rh_col, dev_ptr_lh, lh_col, &beta, d_ret_result, MIN(rh_col, lh_col));
 	if (status != CUBLAS_STATUS_SUCCESS)
 	{
 		err_logln("Error multiplying matrices! Error code: %s", _cudaGetErrorEnum(status));
-		return NULL;
+		goto free;
 	}
-	cuda_stat = cudaMemcpy(ret_result, d_ret_result, size, cudaMemcpyDeviceToHost);
-	CHECK_ERR(cuda_stat);
-free:
+	if ((cuda_stat = cudaMemcpy(ret_result, d_ret_result, size, cudaMemcpyDeviceToHost)) != cudaSuccess)
+	{
+		err_logln("Cuda error caught! Error: ", cudaGetErrorString(cuda_stat));
+		goto free;
+	}
+cuda_free:
 	cudaFree(dev_ptr_lh);
 	cudaFree(dev_ptr_rh);
 	cudaFree(d_ret_result);
+destroy:
 	cublasDestroy(handle);
 	return ret_result;
+free:
+	free(ret_result);
+	goto cuda_free;
 }
 
 /* cuBLAS API errors */
