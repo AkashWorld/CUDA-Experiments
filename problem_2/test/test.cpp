@@ -24,7 +24,6 @@ TEST_CASE("M*N Matrix", "[Matrix]")
         REQUIRE(!final_mat.is_empty());
         REQUIRE(final_mat[0][0] == mat_0[0][0] * mat_1[0][0] + mat_0[0][1] * mat_1[1][0] + mat_0[0][2] * mat_1[2][0]);
         REQUIRE(final_mat[1][1] == mat_0[1][0] * mat_1[0][1] + mat_0[1][1] * mat_1[1][1] + mat_0[1][2] * mat_1[2][1]);
-        final_mat.print_dec();
     }
     SECTION("Visual Random Generator Test")
     {
@@ -36,6 +35,7 @@ TEST_CASE("M*N Matrix", "[Matrix]")
         }
         REQUIRE(number_counter.size() > 1);
     }
+	/*
     SECTION("CPU Block Multiplication Test, NxN")
     {
         auto mat_1 = Matrix<unsigned int>::generate_random_matrix(20, 20);
@@ -46,7 +46,7 @@ TEST_CASE("M*N Matrix", "[Matrix]")
         REQUIRE(result.get_row_size() == 20);
         REQUIRE(result.get_col_size() == 20);
         REQUIRE(normal_result.is_equal(result));
-    }
+    }*/
 	SECTION("CUDA accelerated Multiplication Test")
 	{
 		float arr_0[6] = { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f };
@@ -55,8 +55,34 @@ TEST_CASE("M*N Matrix", "[Matrix]")
 		Matrix<float> mat_1(arr_1, 3, 2);
 		auto normal_result = mat_0 * mat_1;
 		auto cuda_result = mat_0.cuda_multiply(mat_1);
-		REQUIRE(normal_result.is_equal(cuda_result));
+		auto is_eq = normal_result.is_equal(cuda_result);
+		if (is_eq == false)
+		{
+			printf("Normal Result:\n");
+			normal_result.print();
+			printf("Cuda Result:\n");
+			cuda_result.print();
+		}
+		REQUIRE(is_eq);
 	}
+	SECTION("CUDA Accelerated Multiplication Test Med")
+	{
+
+		auto rand_0 = Matrix<float>::generate_random_matrix(50, 75);
+		auto rand_1 = Matrix<float>::generate_random_matrix(75, 80);
+		auto normal_result = rand_0 * rand_1;
+		auto cuda_result = rand_0.cuda_multiply(rand_1);
+		auto is_eq = normal_result.is_equal(cuda_result);
+		if (is_eq == false)
+		{
+			printf("Normal Result:\n");
+			normal_result.print();
+			printf("Cuda Result:\n");
+			cuda_result.print();
+		}
+		REQUIRE(is_eq);
+	}
+	/*
 	SECTION("cuBLAS accelerated Multiplication Test")
 	{
 		float arr_0[6] = { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f };
@@ -67,4 +93,5 @@ TEST_CASE("M*N Matrix", "[Matrix]")
 		auto cublas_result = mat_0.cublas_multiply(mat_1);
 		REQUIRE(normal_result.is_equal(cublas_result));
 	}
+	*/
 }

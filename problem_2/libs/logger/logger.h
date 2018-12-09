@@ -9,7 +9,6 @@ Khalid Akash 2018 - MIT License
 #define DEBUG
 
 /* FOREGROUND */
-#ifndef WIN32
 #define RST "\x1B[0m"
 #define KRED "\x1B[31m"
 #define KGRN "\x1B[32m"
@@ -20,18 +19,6 @@ Khalid Akash 2018 - MIT License
 #define KWHT "\x1B[37m"
 #define BOLD(x) "\x1B[1m" x RST
 #define UNDL(x) "\x1B[4m" x RST
-#else
-#define RST ""
-#define KRED ""
-#define KGRN ""
-#define KYEL ""
-#define KBLU ""
-#define KMAG ""
-#define KCYN ""
-#define KWHT ""
-#define BOLD(x) "" x RST
-#define UNDL(x) "" x RST
-#endif
 
 #define RED(x) KRED x RST
 #define GRN(x) KGRN x RST
