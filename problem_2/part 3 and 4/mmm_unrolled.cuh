@@ -16,9 +16,33 @@
 
 using namespace std::chrono;
 
-#ifndef NUM_UNROLL
-    #define NUM_UNROLL 2
-#endif
+//Compare matrices
+template <typename T>
+int compare_matrices(T *A, T *B, size_t m, size_t n) {
+    float temp = 0;
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            float prev_temp = temp;
+            temp += (float)(A[j + n*i] - B[j + n*i]) * (A[j + n*i] - B[j + n*i]);
+            if (temp - prev_temp > 0.1) {
+                std::cout << "Matrix 1: " << A[j + n*i] << ", " << i << ", " << j << ", Matrix 2: " << B[j + n*i] << "\n";
+                return -1;
+            }
+        }
+    }
+    printf("MSE: %f\n", temp/(float)(m*n));
+    return 0;
+}
+
+//Generates random matrix
+template <typename T>
+void gen_rand_mat(T *Mat, size_t m, size_t n) {
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            Mat[j + n*i] = (T)((2*((float)rand()/(float)RAND_MAX)-1) * 10);
+        }
+    }
+}
 
 //Prints matrix
 template <typename T>
@@ -33,205 +57,46 @@ void print_matrix(T *A, size_t m, size_t n) {
     printf("\n");
 }
 
+//Unrolls the outermost loop and performs matrix multiplication in the GPU (performs C := A*B)
+template <int unrollFactor, typename T>
+__global__ void matrix_multiply_unrolled_one_dim(T *A, T *B, T *C, size_t m, size_t n, size_t p) {
+    int tid1 = threadIdx.x + blockDim.x*blockIdx.x, tid2 = threadIdx.y + blockDim.y*blockIdx.y;
+    T temp;
 
-//Unrolled matrix multiplication in the GPU (performs C := C + A*B)
+    //Unrolling outer loops and multiplying the elements present in shared memory
+    #pragma unroll (unrollFactor)
+    for (int i = 0; i < unrollFactor; i++) {
+        temp = 0;
+        if (tid1*unrollFactor + i < m && tid2 < p) {
+            for (int k = 0; k < n; k++) {
+                temp += A[n*(tid1*unrollFactor + i) + k]*B[k*p + tid2];
+            }
+            C[(tid1*unrollFactor + i)*p + tid2] = temp;
+        }
+    }
+}
+
+//Both outer loops unrolled matrix multiplication in the GPU (performs C := A*B)
 template <int unrollFactor, typename T>
 __global__ void matrix_multiply_unrolled(T *A, T *B, T *C, size_t m, size_t n, size_t p) {
-    //extern __shared__ T temp_arr[];
-    //temp_arr[threadIdx.x + blockDim.x*threadIdx.y] = 0;
     int tid1 = threadIdx.x + blockDim.x*blockIdx.x, tid2 = threadIdx.y + blockDim.y*blockIdx.y;
     T temp = 0;
-//    T *temp_A = temp_arr, *temp_B = &temp_arr[NUM_UNROLL*blockDim.x];
 
-    for (int k = 0; k < n; k += NUM_UNROLL) {
-        /*
+    //Unrolling outer loops and multiplying the elements present in shared memory
+    #pragma unroll (unrollFactor)
+    for (int i = 0; i < unrollFactor; i++) {
         #pragma unroll (unrollFactor)
-        for (int j = 0; j < NUM_UNROLL; j++) {
-            temp_A[j + threadIdx.x*NUM_UNROLL] = A[n*tid1 + k + j];
-            temp_B[j + threadIdx.y*NUM_UNROLL] = B[(k+j)*p + tid2];
-        }
-*/
-        #pragma unroll (unrollFactor)
-        for (int j = 0; j < NUM_UNROLL; j++) {
-            if (tid1 < m && tid2 < p) {
-                temp += A[n*tid1 + k + j]*B[(k+j)*p + tid2];
+        for (int j = 0; j < unrollFactor; j++) {
+            temp = 0;
+            if (tid1*unrollFactor + i < m && tid2*unrollFactor + j < p) {
+                for (int k = 0; k < n; k++) {
+                    temp += A[n*(tid1*unrollFactor + i) + k]*B[k*p + (tid2*unrollFactor + j)];
+                }
+                C[(tid1*unrollFactor + i)*p + tid2*unrollFactor + j] = temp;
             }
         }
-    }
-    if (n % NUM_UNROLL != 0) {
-        for (int k = n - (n % NUM_UNROLL); k < n; k++) {
-            if (tid1 < m && tid2 < p) {
-                temp += A[n*tid1 + k]*B[k*p + tid2];
-            }
-        }
-    }
-    if (tid1 < m && tid2 < p) {
-        C[tid1*p + tid2] = temp;
     }
 }
-
-/*
-//Strassens algorithm in GPU
-template <typename T>
-__global__ void strassen_algo(T *A11, T *A12, T *A21, T *A22, T *B11, T *B12, T *B21, T *B22, T *C11, T *C12, T *C21, T *C22, T *T1, T *T2, size_t n_) {
-    int n = n_/2, tid, tid1, tid2;
-    T temp = 0;
-    tid1 = threadIdx.x + blockDim.x*blockIdx.x, tid2 = threadIdx.y + blockDim.y*blockIdx.y;
-    tid = tid1*n + tid2;
-
-    if (tid1 < n && tid2 < n) {
-        //Steps 1,2,3
-        C12[tid] = A21[tid] - A11[tid];
-        C21[tid] = B11[tid] + B12[tid];
-        __syncthreads();
-        temp = 0;
-        for (int k = 0; k < n; k++) {
-            temp += C12[n*tid1 + k]*C21[k*n + tid2];
-        }
-        C22[tid] = temp;
-        //Steps 4,5,6
-        C12[tid] = A12[tid] - A22[tid];
-        C21[tid] = B21[tid] + B22[tid];
-        __syncthreads();
-        temp = 0;
-        for (int k = 0; k < n; k++) {
-            temp += C12[n*tid1 + k]*C21[k*n + tid2];
-        }
-        C11[tid] = temp;
-        //Steps 7,8,9,10,11
-        C12[tid] = A11[tid] + A22[tid];
-        C21[tid] = B11[tid] + B22[tid];
-        __syncthreads();
-        temp = 0;
-        for (int k = 0; k < n; k++) {
-            temp += C12[n*tid1 + k]*C21[k*n + tid2];
-        }
-        T1[tid] = temp;
-        C11[tid] += T1[tid];
-        C22[tid] += T1[tid];
-        //Steps 12,13,14
-        T2[tid] = A21[tid] + A22[tid];
-        __syncthreads();
-        temp = 0;
-        for (int k = 0; k < n; k++) {
-            temp += T2[n*tid1 + k]*B11[k*n + tid2];
-        }
-
-    }
-}
-
-//Strassen Winograd algorithm in GPU
-__device__ bool flag1, flag2;
-template <typename T>
-__global__ void strassen_winograd_algo(T *A11, T *A12, T *A21, T *A22, T *B11, T *B12, T *B21, T *B22, T *C11, T *C12, T *C21, T *C22, T *T1, T *T2, size_t n_) {
-    //n/2 is the size of the sub-matrices
-    int n = n_/2, tid, tid1, tid2;
-    T temp = 0;// temp_t1, temp_t2;
-  //  if (blockIdx.y < gridDim.y) {
-        //thread idx for first half of iterations
-        tid1 = threadIdx.x + blockDim.x*blockIdx.x, tid2 = threadIdx.y + blockDim.y*blockIdx.y;
-        tid = tid1*n + tid2;
-        /*
-        //Flags to synchronize between two parts
-        if (tid == 0)
-            flag1 = false;
-            
-        if (tid1 < n && tid2 < n) {
-            //Steps 1, 2, 3
-            T1[tid] = A11[tid] - A21[tid];
-            T2[tid] = B22[tid] - B12[tid];
-            __syncthreads();
-            temp = 0;
-            for (int k = 0; k < n; k++) {
-                temp += T1[n*tid1 + k]*T2[k*n + tid2];
-            }
-            C21[tid] = temp;
-
-            //Steps 4, 5, 6
-            T1[tid] = A21[tid] + A22[tid];
-            T2[tid] = B12[tid] - B11[tid];
-            __syncthreads();
-            temp = 0;
-            for (int k = 0; k < n; k++) {
-                temp += T1[n*tid1 + k]*T2[k*n + tid2];
-            }
-            C22[tid] = temp;
-
-            //Steps 7, 8, 9
-            T1[tid] = T1[tid] - A11[tid];
-            T2[tid] = B22[tid] - T2[tid];
-            __syncthreads();
-            temp = 0;
-            for (int k = 0; k < n; k++) {
-                temp += T1[n*tid1 + k]*T2[k*n + tid2];
-            }
-            C11[tid] = temp;
-
-            //Steps 10, 11, 12
-            T1[tid] = A12[tid] - T1[tid];
-            __syncthreads();
-            temp = 0;
-            for (int k = 0; k < n; k++) {
-                temp += T1[n*tid1 + k]*B22[k*n + tid2];
-            }
-            C12[tid] = C22[tid] + temp;
-
-            //Steps 13, 14, 15, 16
-            __syncthreads();
-            temp = 0;
-            for (int k = 0; k < n; k++) {
-                temp += A11[n*tid1 + k]*B11[k*n + tid2];
-            }
-            __syncthreads();
-            T1[tid] = temp;
-            C11[tid] += T1[tid];
-            C12[tid] += C11[tid];
-            C11[tid] += C21[tid];
-
-            __syncthreads();
-            //Steps 17, 18, 19, 20
-            temp = 0;
-            T2[tid] = T2[tid] - B21[tid];
-            __syncthreads();
-            for (int k = 0; k < n; k++) {
-                temp += A22[n*tid1 + k]*T2[k*n + tid2];
-            }
-            C21[tid] = C11[tid] - temp;
-            C22[tid] += C11[tid];
-
-            __syncthreads();
-            //Steps 21, 22
-            temp = 0;
-            for (int k = 0; k < n; k++) {
-                temp += A12[n*tid1 + k]*B21[k*n + tid2];
-            }
-            __syncthreads();
-            C11[tid] = temp + T1[tid];
-
-        }
-    //}
-    /* else {
-        //thread idx for second half of iterations
-        tid1 = threadIdx.x + blockDim.x*blockIdx.x, tid2 = threadIdx.y + blockDim.y*(blockIdx.y - n);
-        tid = tid1*n + tid2;
-        //Flags to synchronize between two parts
-        if (tid == 0)
-            flag2 = false;
-        if (tid1 < n/2 && tid2 < n/2) {
-            //Steps 4, 5, 6
-            T1[tid] = A21[tid] + A22[tid];
-            T2[tid] = B22[tid] - B11[tid];
-            __syncthreads();
-            if (tid == 0)
-                flag2 = true;
-            for (int k = 0; k < n; k++) {
-                temp += T1[n*tid1 + k]*T2[k*n + tid2];
-            }
-            C22[tid] = temp;
-        }
-    }    
-}
-*/
 
 //Function to add matrices in GPU
 template <typename T>
@@ -244,6 +109,7 @@ __global__ void add_mat_gpu(T *A, T *B, T *C, int n) {
     }
 }
 
+//Function to subtract matrices in GPU
 template <typename T>
 __global__ void sub_mat_gpu(T *A, T *B, T *C, int n) {
     int tid, tid1, tid2;
@@ -294,7 +160,7 @@ public:
         }
     }
 
-    //Multiply matrrices
+    //Multiply matrices
     inline void mul_mat(T *A, T *B, T *C, size_t m, size_t n, size_t p) {
         for (int i = 0; i < m; i++) {
             for (int j = 0; j < p; j++) {
@@ -352,17 +218,20 @@ public:
     }
 
     //Performs unrolled matrix multiplication on the GPU.
-    //Returns 0 if correct, also shows time
-    int matrix_multiply_unrolled_gpu(T *A, T *B, T *C, size_t m, size_t n, size_t p, bool t = false, bool v = false) {
+    template <int num_unroll>
+    int matrix_multiply_unrolled_gpu_one_dim(T *A, T *B, T *C, size_t m, size_t n, size_t p, bool t = false, bool v = false) {
         //Getting device parameters of each GPU
         cudaDeviceProp devProp;
         cudaGetDeviceProperties(&devProp, 0);
         int threads_per_block  = devProp.maxThreadsPerBlock;
         int thread_x, thread_y, block_x, block_y;
-        thread_x = std::min((int)m,(int)floor(sqrt(threads_per_block)));
-        thread_y = std::min((int)p,(int)floor(sqrt(threads_per_block)));
-        block_x = (int)ceil((float)m/(float)thread_x);
+        thread_x = std::min((int)ceil((float)m/(float)num_unroll), (int)floor(sqrt(threads_per_block)));
+        thread_y = std::min((int)p, (int)floor(sqrt(threads_per_block)));
+        block_x = (int)ceil((float)((int)ceil((float)m/(float)num_unroll))/(float)thread_x);
         block_y = (int)ceil((float)p/(float)thread_y);
+        dim3 gridDims(block_x, block_y), blockDims(thread_x, thread_y);
+
+      //  std::cout << thread_x << "," << thread_y << "," << block_x << "," << block_y << "," << ((int)ceil((float)m/(float)num_unroll)) << "\n";
 
         //Initializing arrays for GPU
         T *d_A, *d_B, *d_C;
@@ -380,8 +249,7 @@ public:
         if (t == true) {
             start = high_resolution_clock::now();
         }
-        dim3 gridDims(block_x, block_y), blockDims(thread_x, thread_y);
-        matrix_multiply_unrolled<NUM_UNROLL><< <gridDims, blockDims/*, NUM_UNROLL*thread_x*thread_y*sizeof(T)*/>> >(d_A, d_B, d_C, m, n, p);
+        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims, blockDims>> >(d_A, d_B, d_C, m, n, p);
         cudaDeviceSynchronize();
         if (t == true) {
             finish = high_resolution_clock::now();
@@ -402,90 +270,49 @@ public:
 
     }
 
-    //Checks status of cublas and other function returns
-    void status_check(cublasStatus_t status) {
-        if (status != CUBLAS_STATUS_SUCCESS) {
-            if (status == CUBLAS_STATUS_INVALID_VALUE) {
-                std::cout << "CUBLAS_STATUS_INVALID_VALUE.\n";
-            } else if (status == CUBLAS_STATUS_NOT_INITIALIZED) {
-                std::cout << "CUBLAS_STATUS_NOT_INITIALIZED.\n";
-            } else if (status == CUBLAS_STATUS_ARCH_MISMATCH) {
-                std::cout << "CUBLAS_STATUS_ARCH_MISMATCH.\n";
-            } else {
-                std::cout << "CUBLAS_STATUS_EXECUTION_FAILED.\n";
-            }
-            std::cout << "Err: function not performed.\n";
-        }
-    }
+    //Performs unrolled matrix multiplication on the GPU.
+    template <int num_unroll>
+    int matrix_multiply_unrolled_gpu(T *A, T *B, T *C, size_t m, size_t n, size_t p, bool t = false, bool v = false) {
+        //Getting device parameters of each GPU
+        cudaDeviceProp devProp;
+        cudaGetDeviceProperties(&devProp, 0);
+        int threads_per_block  = devProp.maxThreadsPerBlock;
+        int thread_x, thread_y, block_x, block_y;
+        thread_x = std::min((int)ceil(m/(float)num_unroll), (int)floor(sqrt(threads_per_block)));
+        thread_y = std::min((int)ceil(p/(float)num_unroll), (int)floor(sqrt(threads_per_block)));
+        block_x = (int)ceil((float)((int)ceil(m/(float)num_unroll))/(float)thread_x);
+        block_y = (int)ceil((float)((int)ceil(p/(float)num_unroll))/(float)thread_y);
+        dim3 gridDims(block_x, block_y), blockDims(thread_x, thread_y);
 
-    //Transposes the matrix so that the indexing can be swapped between row and column major
-    void row_col_major_swap(T *A, size_t m, size_t n) {
-        T temp = 0;
-
-        for (int i = 0; i < m; i++) {
-            for (int j = i; j < n; j++) {
-                temp = A[i*n + j];
-                A[i*n + j] = A[j*n + i];
-                A[j*n + i] = temp;
-            }
-        }
-
-    }
-
-    /*
-    //Implements cublas gemm function and calculates execution time
-    int matrix_multiply_cublas_gemm(T *A, T *B, T *C, size_t m, size_t n, size_t p, bool t, bool v) {
         //Initializing arrays for GPU
         T *d_A, *d_B, *d_C;
-     //   float *A_, *B_, *C_;
-        cublasStatus_t status;
 
         //Allocating memory for the arrays on the GPU
         cudaMalloc((void **)&d_A, m*n*sizeof(*d_A));
         cudaMalloc((void **)&d_B, n*p*sizeof(*d_B));
         cudaMalloc((void **)&d_C, m*p*sizeof(*d_C));
 
-        //Transposing matrix A and B since they are stored in row major format
-        row_col_major_swap(A, m, n);
-        print_matrix(A, n, m);
-        row_col_major_swap(B, n, p);
-        print_matrix(B, p, n);
-
         //Copying input matrices in the GPU
         cudaMemcpy(d_A, A, m*n*sizeof(*d_A), cudaMemcpyHostToDevice);
         cudaMemcpy(d_B, B, n*p*sizeof(*d_B), cudaMemcpyHostToDevice);
 
-        cublasHandle_t handle;
-        cublasCreate(&handle);
-        float alp = 1, bet = 0;
-
-        //cublas gemm for float
+        //Matrix multiplication
         if (t == true) {
             start = high_resolution_clock::now();
         }
-        status = cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, (int)m, (int)p, (int)n, alpha, d_A, (int)m, d_B, (int)n, beta, d_C, (int)m);
-        status_check(status);
+        matrix_multiply_unrolled<num_unroll><< <gridDims, blockDims>> >(d_A, d_B, d_C, m, n, p);
         cudaDeviceSynchronize();
-        
         if (t == true) {
             finish = high_resolution_clock::now();
-            gemm_time = duration_cast<duration<double>>(finish - start).count();
+            gpu_unrolled_time = duration_cast<duration<double>>(finish - start).count();
             if (v == true) {
-                printf("GPU gemm Time: %f sec(s)\n\n", gemm_time);
+                printf("GPU MM Multiply Unrolled Time: %f sec(s)\n\n", gpu_unrolled_time);
             }
         }
-        
+
         //Copying output matrix from GPU
         cudaMemcpy(C, d_C, m*p*sizeof(*d_C), cudaMemcpyDeviceToHost);
-        status_check(status);
-        //Changing the matrices indexing back to row major
-        row_col_major_swap(A, n, m);
-        row_col_major_swap(B, p, n);
-        row_col_major_swap(C, p, m);
-       // C = reinterpret_cast<T *>(C_);
 
-        status = cublasDestroy(handle);
-        status_check(status);
         cudaFree(d_A);
         cudaFree(d_B);
         cudaFree(d_C);
@@ -493,27 +320,7 @@ public:
         return 0;
 
     }
-    */
 
-    //Gets the latest execution time of the function mentioned as an argument
-    double getExecTime(std::string type) {
-        if (type == "normal") {
-            return serial_time;
-        } else if (type == "cpu_unrolled") {
-            return cpu_unrolled_time;
-        } else if (type == "gpu_unrolled") {
-            return gpu_unrolled_time;
-        } else if (type == "gemm") {
-            return gemm_time;
-        } else if (type == "strassens_cpu") {
-            return str_cpu;
-        } else if (type == "strassens_gpu") {
-            return str_gpu;        
-        } else {
-            printf("Does not exist...\n");
-            return -1;
-        }
-    }
 
     //Implements Wingrad implementation of Strassens's algorithm for square matrices
     int strassens_algo_cpu(T *A, T *B, T *C, size_t n, bool t, bool v) {
@@ -619,6 +426,7 @@ public:
 
     //Performs unrolled matrix multiplication on the GPU.
     //Returns 0 if correct, also shows time
+    template <int num_unroll>
     int strassens_algo_gpu(T *A, T *B, T *C, size_t n, bool t = false, bool v = false) {
         if (n%2 != 0) {
             printf("Please make number of elements per row and column even...\n");
@@ -628,17 +436,21 @@ public:
         cudaDeviceProp devProp;
         cudaGetDeviceProperties(&devProp, 0);
         int threads_per_block  = devProp.maxThreadsPerBlock;
-        int thread_x, thread_y, block_x, block_y;
-        thread_x = std::min((int)(n/2),(int)floor(sqrt(threads_per_block)));
-        thread_y = std::min((int)(n/2),(int)floor(sqrt(threads_per_block)));
+        int thread_x, thread_y, block_x, block_y, thread_x_mul, thread_y_mul, block_x_mul, block_y_mul;
+        thread_x = std::min((int)(n/2), (int)floor(sqrt(threads_per_block)));
+        thread_y = std::min((int)(n/2), (int)floor(sqrt(threads_per_block)));
         block_x = (int)ceil((float)(n/2)/(float)thread_x);
-        block_y = (int)(ceil((float)(n/2)/(float)thread_y));
-        dim3 gridDims(block_x, block_y), blockDims(thread_x, thread_y);
+        block_y = (int)ceil((float)(n/2)/(float)thread_y);
+        thread_x_mul = std::min((int)ceil((float)(n/2)/(float)num_unroll), (int)floor(sqrt(threads_per_block)));
+        thread_y_mul = std::min((int)(n/2), (int)floor(sqrt(threads_per_block)));
+        block_x_mul = (int)ceil((float)((int)ceil((float)(n/2)/(float)num_unroll))/(float)thread_x_mul);
+        block_y_mul = (int)ceil((float)(n/2)/(float)thread_y_mul);
+        dim3 gridDims(block_x, block_y), blockDims(thread_x, thread_y), gridDims2(block_x_mul, block_y_mul), blockDims2(thread_x_mul, thread_y_mul);
+       // std::cout << thread_x << "," << thread_y << "," << block_x << "," << block_y << "\n";
 
         //Initializing sub-arrays for GPU
         T *A11, *A12, *A21, *A22, *B11, *B12, *B21, *B22, *C11, *C12, *C21, *C22, *T1, *T2;
 
-        printf("Allocting memory...\n");
         //Allocating memory for the arrays on the GPU
         cudaMalloc((void **)&A11, ((n*n)/4)*sizeof(*A11));
         cudaMalloc((void **)&A12, ((n*n)/4)*sizeof(*A12));
@@ -655,7 +467,6 @@ public:
         cudaMalloc((void **)&T1, ((n*n)/4)*sizeof(*T1));
         cudaMalloc((void **)&T2, ((n*n)/4)*sizeof(*T2));
 
-        printf("Copying matrices to GPU...\n");
         //Copying input matrices in the GPU
         for (int i = 0; i < n/2; i++) {
             cudaMemcpy(&A11[i*n/2], &A[i*n], (n/2)*sizeof(*A11), cudaMemcpyHostToDevice);
@@ -668,34 +479,32 @@ public:
             cudaMemcpy(&B22[i*n/2], &B[(i + n/2)*n + n/2], (n/2)*sizeof(*B22), cudaMemcpyHostToDevice);
         }
 
-        printf("Starting matrix multiplication...\n");
         //Matrix multiplication
         if (t == true) {
             start = high_resolution_clock::now();
         }
-        //strassen_winograd_algo<< <gridDims, blockDims>> >(A11, A12, A21, A22, B11, B12, B21, B22, C11, C12, C21, C22, T1, T2, n);
         //Implementation starts
         sub_mat_gpu<< <gridDims, blockDims>> >(A11, A21, T1, n/2);
         sub_mat_gpu<< <gridDims, blockDims>> >(B22, B12, T2, n/2);
-        matrix_multiply_unrolled<1><< <gridDims, blockDims>> >(T1, T2, C21, n/2, n/2, n/2);
+        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims2, blockDims2>> >(T1, T2, C21, n/2, n/2, n/2);
         add_mat_gpu<< <gridDims, blockDims>> >(A21, A22, T1, n/2);
         sub_mat_gpu<< <gridDims, blockDims>> >(B12, B11, T2, n/2);
-        matrix_multiply_unrolled<1><< <gridDims, blockDims>> >(T1, T2, C22, n/2, n/2, n/2);
+        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims2, blockDims2>> >(T1, T2, C22, n/2, n/2, n/2);
         sub_mat_gpu<< <gridDims, blockDims>> >(T1, A11, T1, n/2);
         sub_mat_gpu<< <gridDims, blockDims>> >(B22, T2, T2, n/2);
-        matrix_multiply_unrolled<1><< <gridDims, blockDims>> >(T1, T2, C11, n/2, n/2, n/2);
+        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims2, blockDims2>> >(T1, T2, C11, n/2, n/2, n/2);
         sub_mat_gpu<< <gridDims, blockDims>> >(A12, T1, T1, n/2);
-        matrix_multiply_unrolled<1><< <gridDims, blockDims>> >(T1, B22, C12, n/2, n/2, n/2);
+        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims2, blockDims2>> >(T1, B22, C12, n/2, n/2, n/2);
         add_mat_gpu<< <gridDims, blockDims>> >(C22, C12, C12, n/2);
-        matrix_multiply_unrolled<1><< <gridDims, blockDims>> >(A11, B11, T1, n/2, n/2, n/2);
+        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims2, blockDims2>> >(A11, B11, T1, n/2, n/2, n/2);
         add_mat_gpu<< <gridDims, blockDims>> >(C11, T1, C11, n/2);
         add_mat_gpu<< <gridDims, blockDims>> >(C11, C12, C12, n/2);
         add_mat_gpu<< <gridDims, blockDims>> >(C11, C21, C11, n/2);
         sub_mat_gpu<< <gridDims, blockDims>> >(T2, B21, T2, n/2);
-        matrix_multiply_unrolled<1><< <gridDims, blockDims>> >(A22, T2, C21, n/2, n/2, n/2);
+        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims2, blockDims2>> >(A22, T2, C21, n/2, n/2, n/2);
         sub_mat_gpu<< <gridDims, blockDims>> >(C11, C21, C21, n/2);
         add_mat_gpu<< <gridDims, blockDims>> >(C11, C22, C22, n/2);
-        matrix_multiply_unrolled<1><< <gridDims, blockDims>> >(A12, B21, C11, n/2, n/2, n/2);
+        matrix_multiply_unrolled_one_dim<num_unroll><< <gridDims2, blockDims2>> >(A12, B21, C11, n/2, n/2, n/2);
         add_mat_gpu<< <gridDims, blockDims>> >(T1, C11, C11, n/2);
         //Implementation finished
         cudaDeviceSynchronize();
@@ -707,7 +516,6 @@ public:
             }
         }
 
-        printf("Copying output to GPU...\n");
         //Copying output matrix from GPU
         for (int i = 0; i < n/2; i++) {
             cudaMemcpy(&C[i*n], &C11[i*n/2], (n/2)*sizeof(*C11), cudaMemcpyDeviceToHost);
@@ -716,7 +524,6 @@ public:
             cudaMemcpy(&C[(i + n/2)*n + n/2], &C22[i*n/2], (n/2)*sizeof(*C22), cudaMemcpyDeviceToHost);
         }
 
-        printf("Freeing memory...\n");
         cudaFree(A11);
         cudaFree(A12);
         cudaFree(A21);
@@ -734,6 +541,42 @@ public:
         cudaDeviceReset();
         return 0;
 
+    }
+
+    //Checks status of cublas and other function returns
+    void status_check(cublasStatus_t status) {
+        if (status != CUBLAS_STATUS_SUCCESS) {
+            if (status == CUBLAS_STATUS_INVALID_VALUE) {
+                std::cout << "CUBLAS_STATUS_INVALID_VALUE.\n";
+            } else if (status == CUBLAS_STATUS_NOT_INITIALIZED) {
+                std::cout << "CUBLAS_STATUS_NOT_INITIALIZED.\n";
+            } else if (status == CUBLAS_STATUS_ARCH_MISMATCH) {
+                std::cout << "CUBLAS_STATUS_ARCH_MISMATCH.\n";
+            } else {
+                std::cout << "CUBLAS_STATUS_EXECUTION_FAILED.\n";
+            }
+            std::cout << "Err: function not performed.\n";
+        }
+    }
+
+    //Gets the latest execution time of the function mentioned as an argument
+    double getExecTime(std::string type) {
+        if (type == "normal") {
+            return serial_time;
+        } else if (type == "cpu_unrolled") {
+            return cpu_unrolled_time;
+        } else if (type == "gpu_unrolled") {
+            return gpu_unrolled_time;
+        } else if (type == "gemm") {
+            return gemm_time;
+        } else if (type == "strassens_cpu") {
+            return str_cpu;
+        } else if (type == "strassens_gpu") {
+            return str_gpu;        
+        } else {
+            printf("Does not exist...\n");
+            return -1;
+        }
     }
 
 private:
