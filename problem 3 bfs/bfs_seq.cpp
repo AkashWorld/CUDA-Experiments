@@ -6,8 +6,13 @@
 #include <queue>
 #include <time.h>
 #include <cstring>
+#include <chrono>
+
+
+
 
 using namespace std;
+using namespace std::chrono;
 
 
 void loop(bool* visited, queue<int> q);
@@ -16,6 +21,11 @@ void recursive(bool* visited, queue<int> q);
 int** mat;
 int v;
 int e;
+
+/*
+Uses a queue to remember which vertexes to visit. If a vertex is found to be a
+neighbor it adds it to the end of the queue and updates visited array
+*/
 
 void recursive(bool* visited, queue<int> q) {
 	int i;
@@ -161,13 +171,24 @@ int main(int arg, char** argv) {
 
 	cout << "visiting " ;
 
+	clock_t st, end;
+	auto st1 = high_resolution_clock::now();
+
 	if (flag == 1) {
+
 		loop(visited, q);
-	}
+		
+	}else if (flag == 2) {
 	
-	if (flag == 2) {
 		recursive(visited, q);
+	
+		
 	}
+	auto stop = high_resolution_clock::now();
+
+	//cout << "Time taken " << double(end - st) << " us" << endl;
+	auto duration = duration_cast<microseconds>(stop - st1);
+	cout << endl << duration.count() << " microseconds"  << endl;
 	return 0;
 	
 }

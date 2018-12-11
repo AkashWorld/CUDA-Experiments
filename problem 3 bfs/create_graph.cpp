@@ -3,6 +3,9 @@
 #include <cstdlib>
 #include <ctime>
 
+
+/* Created by Suva Shahriaa */
+
 using namespace std;
 
 int main(int arg, char** argv)
@@ -43,7 +46,8 @@ int main(int arg, char** argv)
 
 	}
 	int max = x*x - x - 1;
-	int e = rand() % max + 1;  // max edge? directed?
+	int e = rand() % max + 1;  // random edge generate
+	//e = 7000; // set to 7000 to test
 	
 	//cout << e;
 	cout << "creating graph with: " << x << " vertices " << e << " edges in graph.txt" << endl;

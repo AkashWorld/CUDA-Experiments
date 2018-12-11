@@ -1,3 +1,5 @@
+/* created by Suva Shahria*/
+
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -20,18 +22,23 @@
 using namespace std;
 
 
-
+/*
+Given a vertex, different thread checks each vertex to see if there is an edge
+connecting the vertices.
+*/
 
 __global__
-void cuda_bfs(int v,int idx, int * dmat, bool * d_visited, int * d_push) {
-	
+void cuda_bfs(int v, int idx, int * dmat, bool * d_visited, int * d_push) {
+
+
+
 	int index = idx * v;
 
 	if (threadIdx.x < v) {
-	
-		if (dmat[index+ threadIdx.x ] && !d_visited[threadIdx.x]) {
+
+		if (dmat[index + threadIdx.x] && !d_visited[threadIdx.x]) {
 			//printf("%d-----%d\n", index + threadIdx.x, threadIdx.x);
-		//	printf("%d\n", threadIdx.x);
+			//	printf("%d\n", threadIdx.x);
 			d_visited[threadIdx.x] = true;
 			d_push[threadIdx.x] = 1;
 		}
@@ -39,17 +46,17 @@ void cuda_bfs(int v,int idx, int * dmat, bool * d_visited, int * d_push) {
 
 
 	/*if (threadIdx.x < v) {
-		if (visited[threadIdx.x] == true) {
-			printf("%d\n", threadIdx.x);
+	if (visited[threadIdx.x] == true) {
+	printf("%d\n", threadIdx.x);
 
-		}
+	}
 
 	}
 	/*if (threadIdx.x < v*v) {
-		if (dmat[threadIdx.x] == 1) {
+	if (dmat[threadIdx.x] == 1) {
 
-			printf("%d\n", threadIdx.x);
-		}
+	printf("%d\n", threadIdx.x);
+	}
 	}
 	*/
 }
@@ -77,7 +84,7 @@ int main(int arg, char** argv) {
 	}
 	FILE *pToFile = fopen("graph.txt", "r");
 
-	 
+
 	i = 0;
 
 
@@ -85,36 +92,37 @@ int main(int arg, char** argv) {
 	//
 
 
-	 mat = (int*)malloc(v *v* sizeof(int));
-
-	 while ((single = fgetc(pToFile)) != EOF) {
-
-
-		 if (single != '\n') {
-
-			 if (single == '1') {
-				// cout << i << endl;
-				 mat[i] = 1;
-				 //cout << mat[i] << endl;
-			 }
-			 else {
-				 mat[i] = 0;
-			 }
-			 i++;
-		 }
-
-	 }
-
-
-	 fclose(pToFile);
-
-
-	//return 0;
-	//cout << h_f[1] << h_f[1] << h_f[0];
+	mat = (int*)malloc(v *v * sizeof(int));
 	
 
-	int * dmat;
+	//read from mygraph.txt
+	while ((single = fgetc(pToFile)) != EOF) {
 
+
+		if (single != '\n') {
+
+			if (single == '1') {
+				// cout << i << endl;
+				mat[i] = 1;
+				//cout << mat[i] << endl;
+			}
+			else {
+				mat[i] = 0;
+			}
+			i++;
+		}
+
+	}
+
+
+	fclose(pToFile);
+
+
+
+
+
+	int * dmat;
+	// create device objects
 
 	cudaMalloc((void**)&dmat, sizeof(int) * v*v);
 	cudaMemcpy((void*)dmat, (void*)mat, sizeof(int)*v*v, cudaMemcpyHostToDevice);
@@ -145,20 +153,28 @@ int main(int arg, char** argv) {
 		h_push[i] = 0;
 	}
 
-	//h_push[start] = 1;
-	
+
+
 	cudaMalloc((void**)&d_push, sizeof(int) * v);
 	cudaMemcpy((void*)d_push, (void*)h_push, sizeof(int)*v, cudaMemcpyHostToDevice);
 
+	cudaEvent_t st1, stop;
+	cudaEventCreate(&st1);
+	cudaEventCreate(&stop);
+	float milliseconds = 0;
 
 	int j = 0;;
+	cudaEventRecord(st1);
+
+	// once vertex is found to be a neighbor adds it to end
 	while (!q.empty()) {
 		for (i = 0; i < v; i++) {
 			h_push[i] = 0;
 		}
 
+
 		cudaMemcpy((void*)d_push, (void*)h_push, sizeof(int)*v, cudaMemcpyHostToDevice);
-	//	cudaMemcpy((void*)d_visited, (void*)visited, sizeof(bool)*v, cudaMemcpyHostToDevice);
+		//	cudaMemcpy((void*)d_visited, (void*)visited, sizeof(bool)*v, cudaMemcpyHostToDevice);
 		i = q.front();
 		cout << q.front() << " ";
 		q.pop();
@@ -166,8 +182,8 @@ int main(int arg, char** argv) {
 		cuda_bfs << <1, v >> >(v, i, dmat, d_visited, d_push);
 
 		cudaMemcpy((void*)h_push, (void*)d_push, sizeof(int) * v, cudaMemcpyDeviceToHost);
-	//	cudaMemcpy((void*)d_visited, (void*)visited, sizeof(bool) * v, cudaMemcpyDeviceToHost);
-	//	cout << h_push[1];
+		//	cudaMemcpy((void*)d_visited, (void*)visited, sizeof(bool) * v, cudaMemcpyDeviceToHost);
+		//	cout << h_push[1];
 		for (j = 0; j < v; j++) {
 			if (h_push[j] == 1) {
 				//cout << j;
@@ -178,6 +194,16 @@ int main(int arg, char** argv) {
 		}
 
 	}
+	cudaEventRecord(stop);
+
+	cudaEventSynchronize(stop);
+	cudaEventElapsedTime(&milliseconds, st1, stop);
+
+	cout << endl << milliseconds << " ms" <<endl;
+	cudaFree(dmat);
+	cudaFree(d_visited);
+	cudaFree(d_push);
+	//
 
 	//cuda_bfs << <1, v >> >(v,i, dmat,d_visited, d_push);
 	return 0;
