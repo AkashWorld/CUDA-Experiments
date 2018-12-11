@@ -51,7 +51,7 @@ Khalid Akash 2018 - MIT License
     {                                                             \
         fprintf(stderr, BOLD(RED("ERROR %s - %d:%s(): " fmt)), __TIME__, \
                 __LINE__, __func__, __VA_ARGS__);                 \
-    } while (0)
+    } while (0)													\
 
 #define err_logln(fmt, ...)                                            \
     do                                                                 \
