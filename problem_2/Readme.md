@@ -26,8 +26,8 @@ make
 
 ## Part 3 and 4
 Change directory to part 3 and 4 and then run make
-``
-cd './part 3 and 4'
+```
+cd "./part 3 and 4"
 make
 ```
 
