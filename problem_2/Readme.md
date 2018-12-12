@@ -9,6 +9,8 @@ This project compares different methods of matrix multiplication: classical CPU 
 
 ### Installing
 
+## Part 1 and 2
+
 With the prerequisites satisfied, run cmake in relative to the problem_2 root directory. It is recommended that a build directory is made, and the cmake build files are built in there. For example:
 ```
 mkdir ./build #Make a build repository at ./problem_2/build  
@@ -22,8 +24,15 @@ In the traditional linux system, run the following command:
 make
 ```
 
-## Running the tests
+## Part 3 and 4
+Change directory to part 3 and 4 and then run make
+``
+cd './part 3 and 4'
+make
+```
 
+## Running the tests
+*Only for part 1 and 2*
 Build the project as specified in the **Installing** section.  
 Run the following command at the root **build** directory:
 ```
@@ -37,6 +46,7 @@ To run the tests directly, run the following in the root **build** directory:
 ## Authors
 
 * **Khalid Akash**
+* **Bhargav Gokalgandhi**
 
 ## License
 
