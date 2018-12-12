@@ -13,7 +13,7 @@ With the prerequisites satisfied, run cmake in relative to the problem_2 root di
 ```
 mkdir ./build #Make a build repository at ./problem_2/build  
 cd build  
-cmake ..
+cmake -DCMAKE_BUILD_TYPE=Release .. #Alternatively, cmake .. will also work.
 ```
 
 Then run the platform specific build tool that is available in the build folder, such as make, ninja, or msvc.  
