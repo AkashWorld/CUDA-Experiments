@@ -11,12 +11,6 @@
 
 static const char *_cudaGetErrorEnum(cublasStatus_t error);
 
-#define CHECK_ERR(x)                                                           \
-  if (x != cudaSuccess) {                                                      \
-    err_logln("Cuda error caught! Error: ", cudaGetErrorString(x));            \
-    goto free;                                                                 \
-  }		
-
 #define BLOCK_WIDTH 32
 
 __global__ void blocked_mat_mul(float *lh_mat, float *rh_mat, float *res_mat,
@@ -103,15 +97,24 @@ float *fl_cuda_block_matrix_multiply(float *lh_mat, float *rh_mat,
 	}
 	error_stat = cudaMemcpy(dev_rh_mat, rh_mat, rh_row * rh_col * sizeof(float),
 		cudaMemcpyHostToDevice);
-	CHECK_ERR(error_stat);
+	if (error_stat != cudaSuccess) {
+		err_logln("Cuda error caught! Error: ", cudaGetErrorString(error_stat));
+		goto free;
+	}
 	error_stat = cudaMemcpy(dev_lh_mat, lh_mat, lh_row * lh_col * sizeof(float),
 		cudaMemcpyHostToDevice);
-	CHECK_ERR(error_stat);
+	if (error_stat != cudaSuccess) {
+		err_logln("Cuda error caught! Error: ", cudaGetErrorString(error_stat));
+		goto free;
+	}
 	dim3 dim_block(BLOCK_WIDTH, BLOCK_WIDTH);
 	dim3 dim_grid(rh_col / dim_block.x, lh_row / dim_block.y);
-	blocked_mat_mul <<<dim_grid, dim_block>>> (dev_lh_mat, dev_rh_mat, dev_res_mat, lh_row, lh_col, rh_row, rh_col);
+	blocked_mat_mul <<<dim_grid, dim_block >>> (dev_lh_mat, dev_rh_mat, dev_res_mat, lh_row, lh_col, rh_row, rh_col);
 	error_stat = cudaMemcpy(result_matrix, dev_res_mat, size, cudaMemcpyDeviceToHost);
-	CHECK_ERR(error_stat);
+	if (error_stat != cudaSuccess) {
+		err_logln("Cuda error caught! Error: ", cudaGetErrorString(error_stat));
+		goto free;
+	}
 cuda_free:
 	if ((error_stat = cudaFree(dev_rh_mat)) != cudaSuccess) {
 		err_logln("Error freeing device memory! Error: %s",
@@ -185,16 +188,25 @@ float *fl_cuda_matrix_multiply(float *lh_mat, float *rh_mat,
 		return NULL;
 	}
 	error_stat = cudaMemcpy(dev_rh_mat, rh_mat, rh_row * rh_col * sizeof(float), cudaMemcpyHostToDevice);
-	CHECK_ERR(error_stat);
+	if (error_stat != cudaSuccess) {
+		err_logln("Cuda error caught! Error: ", cudaGetErrorString(error_stat));
+		goto free;
+	}
 	error_stat = cudaMemcpy(dev_lh_mat, lh_mat, lh_row * lh_col * sizeof(float), cudaMemcpyHostToDevice);
-	CHECK_ERR(error_stat);
+	if (error_stat != cudaSuccess) {
+		err_logln("Cuda error caught! Error: ", cudaGetErrorString(error_stat));
+		goto free;
+	}
 	dim3 threads_per_block(32, 32);
 	dim3 numb_blocks(lh_row / threads_per_block.x + 1,
 		rh_col / threads_per_block.y + 1);
 	matrix_multiply <<<numb_blocks, threads_per_block >>> (
 		dev_lh_mat, dev_rh_mat, dev_res_mat, lh_row, lh_col, rh_row, rh_col);
 	error_stat = cudaMemcpy(result_matrix, dev_res_mat, size, cudaMemcpyDeviceToHost);
-	CHECK_ERR(error_stat);
+	if (error_stat != cudaSuccess) {
+		err_logln("Cuda error caught! Error: ", cudaGetErrorString(error_stat));
+		goto free;
+	}
 free:
 	if ((error_stat = cudaFree(dev_rh_mat)) != cudaSuccess) {
 		err_logln("Error freeing device memory! Error: %s",
