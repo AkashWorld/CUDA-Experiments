@@ -1,5 +1,5 @@
 all: stats.cu
-	nvcc stats.cu -o stats
+	nvcc --std=c++11 stats.cu -o stats
 
 clean:
 	rm stats
