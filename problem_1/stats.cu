@@ -191,7 +191,7 @@ int main(void) {
     end = std::chrono::high_resolution_clock::now();
     dur_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start);
     cout << "GPU calculated max:" << fixed << gpu_max << endl;
-    fprintf(stdout, "Elapsed time %lld ns\n", dur_ns.count());
+    fprintf(stdout, "Elapsed time %lld ns\n\n", dur_ns.count());
 
     // use CPU to calculate min
     start = std::chrono::high_resolution_clock::now();
@@ -212,7 +212,7 @@ int main(void) {
     end = std::chrono::high_resolution_clock::now();
     dur_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start);
     cout << "GPU calculated min:" << fixed << gpu_min << endl;
-    fprintf(stdout, "Elapsed time %lld ns\n", dur_ns.count());
+    fprintf(stdout, "Elapsed time %lld ns\n\n", dur_ns.count());
 
     // use CPU to calculate mean
     start = std::chrono::high_resolution_clock::now();
@@ -233,7 +233,7 @@ int main(void) {
     end = std::chrono::high_resolution_clock::now();
     dur_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start);
     cout << "GPU calculated mean:" << fixed << gpu_sum/N << endl;
-    fprintf(stdout, "Elapsed time %lld ns\n", dur_ns.count());
+    fprintf(stdout, "Elapsed time %lld ns\n\n", dur_ns.count());
 
     // use CPU to calculate std dev
     start = std::chrono::high_resolution_clock::now();
@@ -254,7 +254,7 @@ int main(void) {
     end = std::chrono::high_resolution_clock::now();
     dur_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start);
     cout << "GPU calculated std dev:" << fixed << sqrt(gpu_m2/N) << endl;
-    fprintf(stdout, "Elapsed time %lld ns\n", dur_ns.count());
+    fprintf(stdout, "Elapsed time %lld ns\n\n", dur_ns.count());
 
     // use CPU to calculate all stats
     start = std::chrono::high_resolution_clock::now();
@@ -303,6 +303,4 @@ int main(void) {
     // Free memory
     cudaFree(x);
     cudaFree(all_results);
-
-    return 0;
 }
