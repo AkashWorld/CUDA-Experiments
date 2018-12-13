@@ -8,8 +8,8 @@
 #include <chrono>
 #include <vector>
 #include <type_traits>
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
 
 typedef float testType;
 

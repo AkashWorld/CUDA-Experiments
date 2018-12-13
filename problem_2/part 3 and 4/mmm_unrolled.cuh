@@ -10,9 +10,9 @@
 #include <string>
 #include <utility>
 #include <iomanip>
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
-#include "cublas_v2.h"
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
+#include <cublas_v2.h>
 
 using namespace std::chrono;
 
