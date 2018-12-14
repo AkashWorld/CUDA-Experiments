@@ -27,16 +27,16 @@ double cpu_get_mean(int n, double *x) {
 // use CPU to calculate std deviation (Welford's algorithm)
 double cpu_get_stddev(int n, double *x){
     double mean = x[0];
-    double M2 = 0;
+    double m2 = 0;
     double delta;
     double delta2;
     for (int i = 1; i < n; i++){
         delta = x[i] - mean;
         mean += delta/(i+1);
         delta2 = x[i] - mean;
-        M2 += delta * delta2;
+        m2 += delta * delta2;
     }
-    return sqrt(M2/n);
+    return sqrt(m2/n);
 }
 
 // CPU function to find max element of an array
@@ -63,7 +63,7 @@ stats cpu_get_all(int n, double *x){
     double mean = x[0];
     double min = x[0];
     double max = x[0];
-    double M2 = 0;
+    double m2 = 0;
     double delta;
     double delta2;
     for (int i = 1; i < n; i++){
@@ -72,12 +72,12 @@ stats cpu_get_all(int n, double *x){
         delta = x[i] - mean;
         mean += delta/(i+1);
         delta2 = x[i] - mean;
-        M2 += delta * delta2;
+        m2 += delta * delta2;
     }
     myStats.mean = mean;
     myStats.min = min;
     myStats.max = max;
-    myStats.stddev = sqrt(M2/n);
+    myStats.stddev = sqrt(m2/n);
     return myStats;
 }
 
@@ -108,16 +108,18 @@ __global__ void get_gpu_stddev(int n, double *x, double *results){
     int index = threadIdx.x;
     int stride = blockDim.x;
     double mean = x[index];
-    double M2 = 0;
+    double m2 = 0;
     double delta;
     double delta2;
+    int count = 1;
     for (int i = index + stride; i < n; i += stride){
+        count++;
         delta = x[i] - mean;
-        mean += delta/(i+1);
+        mean += delta/count;
         delta2 = x[i] - mean;
-        M2 += delta * delta2;
+        m2 += delta * delta2;
     }
-    results[threadIdx.x] = M2;
+    results[threadIdx.x] = m2;
 }
 
 __global__ void get_gpu_sum(int n, double *x, double *results) {
@@ -137,21 +139,23 @@ __global__ void get_gpu_all(int n, double *x, stats *all_results){
     double mean = x[index];
     double min = x[index];
     double max = x[index];
-    double M2 = 0;
+    double m2 = 0;
     double delta;
     double delta2;
+    int count = 1;
     for (int i = index + stride; i < n; i += stride){
         max = (max < x[i]) ? x[i] : max;
         min = (x[i] < min) ? x[i] : min;
+        count++;
         delta = x[i] - mean;
-        mean += delta/(i+1);
+        mean += delta/count;
         delta2 = x[i] - mean;
-        M2 += delta * delta2;
+        m2 += delta * delta2;
     }
     all_results[threadIdx.x].mean = mean;
     all_results[threadIdx.x].min = min;
     all_results[threadIdx.x].max = max;
-    all_results[threadIdx.x].stddev = M2; // m2 not actually std dev
+    all_results[threadIdx.x].stddev = m2; // m2 not actually std dev
 }
 int main(void) {
 
@@ -182,7 +186,7 @@ int main(void) {
 
     // use GPU to calculate max
     start = std::chrono::high_resolution_clock::now();
-    get_gpu_max<<<1, THREADS_PER_BLK>>>(N, x, results);
+    get_gpu_max<<<N_BLOCKS, THREADS_PER_BLK>>>(N, x, results);
     cudaDeviceSynchronize();
     double gpu_max = results[0];
     for (int i = 1; i < THREADS_PER_BLK; i++) {
@@ -269,12 +273,20 @@ int main(void) {
 
     cudaFree(results);
 
-    // use GPU to calculate all stats FIXME: incomplete
+    // use GPU to calculate all stats
     stats* all_results;
     cudaMallocManaged(&all_results, N_BLOCKS*THREADS_PER_BLK*sizeof(stats));
+    
+    // start the timer
     start = std::chrono::high_resolution_clock::now();
+
+    // run calculations on the GPU
     get_gpu_all<<<N_BLOCKS, THREADS_PER_BLK>>>(N, x, all_results);
+
+    // synchrnonize 
     cudaDeviceSynchronize();
+
+    // We now need to accumulate results from all threads
     double m2 = all_results[0].stddev;
     double mean = all_results[0].mean;
     double delta;
@@ -286,9 +298,14 @@ int main(void) {
     for (int i = 1; i < N_BLOCKS*THREADS_PER_BLK; i++) {
         new_mean = all_results[i].mean;
         delta = new_mean - mean;
+
+        // we update our running mean value
         mean = (n_a*mean + n_b*new_mean)/(n_a + n_b);
+
         m2 += all_results[i].stddev + delta * delta * n_a * n_b / (n_a + n_b);
+
         n_a += n_b;
+
         min = (all_results[i].min < min) ? all_results[i].min : min;
         max = (all_results[i].max > max) ? all_results[i].max : max;
     }
