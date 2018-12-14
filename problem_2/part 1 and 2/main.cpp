@@ -19,10 +19,10 @@ void cuda_matrix_multiplication(const std::size_t size,
   }
   auto end = std::chrono::high_resolution_clock::now();
   auto delta = end - start;
-  auto dur_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(delta);
+  auto dur_ns = std::chrono::duration_cast<std::chrono::microseconds>(delta);
   fprintf(stdout,
           "\r"
-          "elapsed time " YEL("%lld ns\n"),
+          "elapsed time " YEL("%lld microsecs\n"),
           dur_ns.count());
 }
 
@@ -43,10 +43,10 @@ void cuda_block_matrix_multiplication(const std::size_t size,
 	}
 	auto end = std::chrono::high_resolution_clock::now();
 	auto delta = end - start;
-	auto dur_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(delta);
+	auto dur_ns = std::chrono::duration_cast<std::chrono::microseconds>(delta);
 	fprintf(stdout,
 		"\r"
-		"elapsed time " YEL("%lld ns\n"),
+		"elapsed time " YEL("%lld microsecs\n"),
 		dur_ns.count());
 }
 
@@ -67,10 +67,10 @@ void cublas_matrix_multiplication(const std::size_t size,
   }
   auto end = std::chrono::high_resolution_clock::now();
   auto delta = end - start;
-  auto dur_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(delta);
+  auto dur_ns = std::chrono::duration_cast<std::chrono::microseconds>(delta);
   fprintf(stdout,
           "\r"
-          "elapsed time " YEL("%lld ns\n"),
+          "elapsed time " YEL("%lld microsecs\n"),
           dur_ns.count());
 }
 
@@ -91,26 +91,31 @@ void naive_matrix_multiplication(const std::size_t size,
   }
   auto end = std::chrono::high_resolution_clock::now();
   auto delta = end - start;
-  auto dur_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(delta);
+  auto dur_ns = std::chrono::duration_cast<std::chrono::microseconds>(delta);
   fprintf(stdout,
           "\r"
-          "elapsed time " YEL("%lld ns\n"),
+          "elapsed time " YEL("%lld microsecs\n"),
           dur_ns.count());
 }
 
 int main(int argc, char **argv) {
   fprintf(stdout, (BOLD(GRN("Matrix Multiplication\n"))));
-  cublas_matrix_multiplication(256, 500);
+  cublas_matrix_multiplication(128, 1000);
   cublas_matrix_multiplication(256, 1000);
-  cublas_matrix_multiplication(256, 1500);
-  cuda_matrix_multiplication(256, 500);
+  cublas_matrix_multiplication(512, 1000);
+  cublas_matrix_multiplication(1024, 1000);
+  cublas_matrix_multiplication(2048, 1000);
+  cuda_matrix_multiplication(128, 1000);
   cuda_matrix_multiplication(256, 1000);
-  cuda_matrix_multiplication(256, 1500);
-  cuda_block_matrix_multiplication(256, 500);
+  cuda_matrix_multiplication(512, 1000);
+  cuda_matrix_multiplication(1024, 1000);
+  cuda_matrix_multiplication(2048, 1000);
+  cuda_block_matrix_multiplication(128, 1000);
   cuda_block_matrix_multiplication(256, 1000);
-  cuda_block_matrix_multiplication(256, 1500);
+  cuda_block_matrix_multiplication(512, 1000);
+  cuda_block_matrix_multiplication(1024, 1000);
+  cuda_block_matrix_multiplication(2048, 1000);
   naive_matrix_multiplication(256, 500);
-  naive_matrix_multiplication(256, 1000);
-  naive_matrix_multiplication(256, 1500);
+  naive_matrix_multiplication(512, 500);
   return 0;
 }

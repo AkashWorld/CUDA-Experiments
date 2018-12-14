@@ -2,7 +2,7 @@
 #include <catch.hpp>
 #include <vector>
 #include <unordered_set>
-#include "../src/matrix.h"
+#include "../part 1 and 2/matrix.h"
 
 TEST_CASE("Naive M*N Matrix", "[Matrix]")
 {

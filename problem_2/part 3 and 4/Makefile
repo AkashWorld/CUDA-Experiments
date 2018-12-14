@@ -7,10 +7,9 @@ ARCH = -arch=sm_35
 all: $(TARGET)
 
 $(TARGET): mm_$(TARGET).cu
-	$(CC) -o $(TARGET) mm_$(TARGET).cu $(CUFLAGS) $(CFLAGS) $(ARCH)
+	$(CC) -I${CUDA_PATH}/include -o $(TARGET) mm_$(TARGET).cu $(CUFLAGS) $(CFLAGS) $(ARCH)
 
 clean:
 	rm $(TARGET)
-
-run:
+ run:
 	@$(MAKE) && ./$(TARGET)

@@ -1,0 +1,20 @@
+clc;
+clear all;
+close all;
+
+i = 128;k = 1;
+while i <= 2048
+    M(:,k) = csvread(['C:\Users\Bhargav04\Documents\distributed computing group 6\Project3-Problem2\CUDA-Experiments\problem_2\part 3 and 4\speed_up_tesla_k40m\speed_up_for_',char(int2str(i)),'_element_matrix.csv']);
+    i = i*2;
+    k = k + 1;
+end
+
+figure;
+plot(2.^(7:11), M(1,:));
+
+figure;
+for i = 1:5
+    plot(2.^(0:7), M(1:8,i)); hold on;
+end
+legend('128x128 matrix','256x256 matrix', '512x512 matrix', '1024x1024 matrix', '20');
+grid on;
