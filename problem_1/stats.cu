@@ -83,30 +83,43 @@ stats cpu_get_all(int n, double *x){
 
 // Kernel function to find the maximum element of an array
 __global__ void get_gpu_max(int n, double *x, double *results) {
-    int index = threadIdx.x;
-    int stride = blockDim.x;
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
     double max = x[index];
-    for (int i = index + 1; i < n; i += stride) {
+    for (int i = index + stride; i < n; i += stride) {
         max = (max < x[i]) ? x[i] : max;
     }
-    results[threadIdx.x] = max;
+    results[index] = max;
 }
 
 // Kernel function to find the minimum element of an array
 __global__ void get_gpu_min(int n, double *x, double *results) {
-    int index = threadIdx.x;
-    int stride = blockDim.x;
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
     double min = x[index];
-    for (int i = index + 1; i < n; i += stride) {
+    for (int i = index + stride; i < n; i += stride) {
         min = (x[i] < min) ? x[i] : min;
     }
-    results[threadIdx.x] = min;
+    results[index] = min;
+}
+
+// kernel to calculate the mean on the GPU
+__global__ void get_gpu_mean(int n, double *x, double *results) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+    double mean = x[index];
+    int count = 1;
+    for (int i = index + stride; i < n; i += stride){
+        count++;
+        mean += (x[i] - mean)/count;
+    }
+    results[index] = mean;
 }
 
 // Calculate std deviation on the GPU
 __global__ void get_gpu_stddev(int n, double *x, double *results){
-    int index = threadIdx.x;
-    int stride = blockDim.x;
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
     double mean = x[index];
     double m2 = 0;
     double delta;
@@ -119,23 +132,15 @@ __global__ void get_gpu_stddev(int n, double *x, double *results){
         delta2 = x[i] - mean;
         m2 += delta * delta2;
     }
-    results[threadIdx.x] = m2;
+    results[index] = m2;
 }
 
-__global__ void get_gpu_sum(int n, double *x, double *results) {
-    int index = threadIdx.x;
-    int stride = blockDim.x;
-    double sum = 0;
-    for (int i = index; i < n; i += stride) {
-        sum += x[i];
-    }
-    results[threadIdx.x] = sum;
-}
+
 
 // caluclate all stats on the GPU
 __global__ void get_gpu_all(int n, double *x, stats *all_results){
-    int index = threadIdx.x;
-    int stride = blockDim.x;
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
     double mean = x[index];
     double min = x[index];
     double max = x[index];
@@ -152,19 +157,28 @@ __global__ void get_gpu_all(int n, double *x, stats *all_results){
         delta2 = x[i] - mean;
         m2 += delta * delta2;
     }
-    all_results[threadIdx.x].mean = mean;
-    all_results[threadIdx.x].min = min;
-    all_results[threadIdx.x].max = max;
-    all_results[threadIdx.x].stddev = m2; // m2 not actually std dev
+    all_results[index].mean = mean;
+    all_results[index].min = min;
+    all_results[index].max = max;
+    all_results[index].stddev = m2; // m2 not actually std dev
 }
+
+void print_diff(double x, double y){
+    cout << "Difference: " << 100*(y - x)/x << "%\n";
+}
+
 int main(void) {
 
-    int THREADS_PER_BLK = 256;
-    int N_BLOCKS = 1;
-    int N = 195312*THREADS_PER_BLK; // ~50M
+    int THREADS_PER_BLK = 1024;
+    int N_BLOCKS = 8;
+    int N_PER_THREAD = 100000000 / (N_BLOCKS * THREADS_PER_BLK);
+    int N = N_BLOCKS * THREADS_PER_BLK * N_PER_THREAD;
+ 
+    // We want to display floats with max precision
     cout.precision(17);
    
     // Allocate memory and initialize x
+    cout << "N = " << N << endl;
     cout << "Allocating memory and initializing...";
     double *x;
     cudaMallocManaged(&x, N*sizeof(double));
@@ -173,7 +187,7 @@ int main(void) {
       x[i] = ((double) rand()) / ((double) RAND_MAX);
     }
     double *results;
-    cudaMallocManaged(&results, THREADS_PER_BLK*sizeof(double));
+    cudaMallocManaged(&results, N_BLOCKS*THREADS_PER_BLK*sizeof(double));
     cout << "Done\n";
 
     // use CPU to calculate max
@@ -189,13 +203,16 @@ int main(void) {
     get_gpu_max<<<N_BLOCKS, THREADS_PER_BLK>>>(N, x, results);
     cudaDeviceSynchronize();
     double gpu_max = results[0];
-    for (int i = 1; i < THREADS_PER_BLK; i++) {
+    for (int i = 1; i < N_BLOCKS*THREADS_PER_BLK; i++) {
         gpu_max = (gpu_max < results[i]) ? results[i] : gpu_max;
     }
     end = std::chrono::high_resolution_clock::now();
     dur_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start);
     cout << "GPU calculated max:" << fixed << gpu_max << endl;
-    fprintf(stdout, "Elapsed time %lld ns\n\n", dur_ns.count());
+    fprintf(stdout, "Elapsed time %lld ns\n", dur_ns.count());
+
+    print_diff(cpu_max, gpu_max);
+    cout << endl;
 
     // use CPU to calculate min
     start = std::chrono::high_resolution_clock::now();
@@ -207,16 +224,19 @@ int main(void) {
 
     // use GPU to calculate min
     start = std::chrono::high_resolution_clock::now();
-    get_gpu_min<<<1, THREADS_PER_BLK>>>(N, x, results);
+    get_gpu_min<<<N_BLOCKS, THREADS_PER_BLK>>>(N, x, results);
     cudaDeviceSynchronize();
     double gpu_min = results[0];
-    for (int i = 1; i < THREADS_PER_BLK; i++) {
+    for (int i = 1; i < N_BLOCKS*THREADS_PER_BLK; i++) {
         gpu_min = (results[i] < gpu_min) ? results[i] : gpu_min;
     }
     end = std::chrono::high_resolution_clock::now();
     dur_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start);
     cout << "GPU calculated min:" << fixed << gpu_min << endl;
-    fprintf(stdout, "Elapsed time %lld ns\n\n", dur_ns.count());
+    fprintf(stdout, "Elapsed time %lld ns\n", dur_ns.count());
+
+    print_diff(cpu_min, gpu_min);
+    cout << endl;
 
     // use CPU to calculate mean
     start = std::chrono::high_resolution_clock::now();
@@ -228,16 +248,20 @@ int main(void) {
 
     // use GPU to calculate mean
     start = std::chrono::high_resolution_clock::now();
-    get_gpu_sum<<<1, THREADS_PER_BLK>>>(N, x, results);
+    get_gpu_mean<<<N_BLOCKS, THREADS_PER_BLK>>>(N, x, results);
     cudaDeviceSynchronize();
-    double gpu_sum = 0;
+    double gpu_mean_sum = 0;
     for (int i = 0; i < N_BLOCKS*THREADS_PER_BLK; i++) {
-        gpu_sum += results[i];
+        gpu_mean_sum += results[i];
     }
+    double gpu_mean = gpu_mean_sum/(N_BLOCKS*THREADS_PER_BLK);
     end = std::chrono::high_resolution_clock::now();
     dur_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start);
-    cout << "GPU calculated mean:" << fixed << gpu_sum/N << endl;
-    fprintf(stdout, "Elapsed time %lld ns\n\n", dur_ns.count());
+    cout << "GPU calculated mean:" << fixed << gpu_mean << endl;
+    fprintf(stdout, "Elapsed time %lld ns\n", dur_ns.count());
+
+    print_diff(cpu_mean, gpu_mean);
+    cout << endl;
 
     // use CPU to calculate std dev
     start = std::chrono::high_resolution_clock::now();
@@ -249,16 +273,20 @@ int main(void) {
 
     // use GPU to calculate std dev
     start = std::chrono::high_resolution_clock::now();
-    get_gpu_stddev<<<1, THREADS_PER_BLK>>>(N, x, results);
+    get_gpu_stddev<<<N_BLOCKS, THREADS_PER_BLK>>>(N, x, results);
     cudaDeviceSynchronize();
     double gpu_m2 = 0;
     for (int i = 0; i < N_BLOCKS*THREADS_PER_BLK; i++) {
         gpu_m2 += results[i];
     }
+    double gpu_stddev = sqrt(gpu_m2/N);
     end = std::chrono::high_resolution_clock::now();
     dur_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start);
-    cout << "GPU calculated std dev:" << fixed << sqrt(gpu_m2/N) << endl;
-    fprintf(stdout, "Elapsed time %lld ns\n\n", dur_ns.count());
+    cout << "GPU calculated std dev:" << fixed << gpu_stddev << endl;
+    fprintf(stdout, "Elapsed time %lld ns\n", dur_ns.count());
+
+    print_diff(cpu_stddev, gpu_stddev);
+    cout << endl;
 
     // use CPU to calculate all stats
     start = std::chrono::high_resolution_clock::now();
@@ -309,12 +337,13 @@ int main(void) {
         min = (all_results[i].min < min) ? all_results[i].min : min;
         max = (all_results[i].max > max) ? all_results[i].max : max;
     }
+    double stddev = sqrt(m2/N);
     end = std::chrono::high_resolution_clock::now();
     dur_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start);
     cout << "Concurrent: GPU calculated max:" << fixed << max << endl;
     cout << "Concurrent: GPU calculated min:" << fixed << min << endl;
     cout << "Concurrent: GPU calculated mean:" << fixed << mean << endl;
-    cout << "Concurrent: GPU calculated std dev:" << fixed << sqrt(m2/N) << endl;
+    cout << "Concurrent: GPU calculated std dev:" << fixed << stddev << endl;
     fprintf(stdout, "Elapsed time %lld ns\n", dur_ns.count());
     
     // Free memory
