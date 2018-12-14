@@ -128,6 +128,10 @@ cuda_free:
 		err_logln("Error freeing device memory! Error: %s",
 			cudaGetErrorString(error_stat));
 	}
+	error_stat = cudaDeviceReset();
+	if (error_stat != cudaSuccess) {
+		err_logln("Cuda error caught! Error: ", cudaGetErrorString(error_stat));
+	}
 	return result_matrix;
 free:
 	free(result_matrix);
@@ -220,6 +224,10 @@ free:
 		err_logln("Error freeing device memory! Error: %s",
 			cudaGetErrorString(error_stat));
 	}
+	error_stat = cudaDeviceReset();
+	if (error_stat != cudaSuccess) {
+		err_logln("Cuda error caught! Error: ", cudaGetErrorString(error_stat));
+	}
 	return result_matrix;
 }
 
@@ -294,6 +302,10 @@ cuda_free:
 	cudaFree(d_ret_result);
 destroy:
 	cublasDestroy(handle);
+	cuda_stat = cudaDeviceReset();
+	if (cuda_stat != cudaSuccess) {
+		err_logln("Cuda error caught! Error: ", cudaGetErrorString(cuda_stat));
+	}
 	return ret_result;
 free:
 	free(ret_result);
